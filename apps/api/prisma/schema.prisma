@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  OPERATIONS
+  OPS_ADMIN
+  SUPER_ADMIN
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SNACK
+  DINNER
+}
+
+enum Diet {
+  VEG
+  NON_VEG
+  EGG
+  MIXED
+}
+
+enum AllergySeverity {
+  NOT_DECLARED
+  NONE
+  MILD
+  MODERATE
+  SEVERE
+}
+
+enum SubscriptionStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum MealStatus {
+  SCHEDULED
+  PAUSED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  EXCEPTION
+  RESOLVED
+}
+
+enum DeliveryStatus {
+  ASSIGNED
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ExceptionStatus {
+  OPEN
+  RESOLVED
+}
+
+/// Atomic counters for readable IDs (customer C1001, subscription THP1001, invoices).
+model Counter {
+  key   String @id
+  value Int
+}
+
+/// Login identity. Customers use phone and OTP; staff use email and password.
+model User {
+  id           String    @id @default(uuid())
+  role         Role
+  name         String
+  email        String?   @unique
+  phone        String?   @unique
+  passwordHash String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  customer     Customer?
+}
+
+/// One-time passwords (hashed, expiring, attempt-limited).
+model OtpCode {
+  id        String    @id @default(uuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([phone, createdAt])
+}
+
+/// Customer profile, body details and allergy declaration.
+model Customer {
+  id              String          @id @default(uuid())
+  code            String          @unique
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id])
+  name            String
+  phone           String
+  email           String?
+  city            String?
+  gender          String?
+  age             Int?
+  weightKg        Float?
+  heightCm        Float?
+  allergySeverity AllergySeverity @default(NOT_DECLARED)
+  allergens       String[]
+  allergyNotes    String?
+  dislikes        String?
+  createdAt       DateTime        @default(now())
+  subscriptions   Subscription[]
+  addresses       SavedAddress[]
+  payments        Payment[]
+}
+
+/// Addresses a customer saved for reuse. Subscription addresses are copied and fixed after payment.
+model SavedAddress {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  label      String
+  line1      String
+  landmark   String?
+  city       String
+  pincode    String
+}
+
+/// A goal the customer can subscribe to (weight loss, diabetes friendly, ...).
+model Plan {
+  id          String         @id @default(uuid())
+  slug        String         @unique
+  name        String
+  grp         String // GOAL | HEALTH
+  description String
+  sort        Int            @default(0)
+  rates       RateCard[]
+  subs        Subscription[]
+  dishes      Dish[]
+}
+
+/// Price per meal type for a plan.
+model RateCard {
+  planId   String
+  plan     Plan     @relation(fields: [planId], references: [id])
+  mealType MealType
+  price    Int
+
+  @@id([planId, mealType])
+}
+
+/// A dish with diet type and allergens, used for meal assignment and swaps.
+model Dish {
+  id        String   @id @default(uuid())
+  name      String
+  mealType  MealType
+  diet      Diet
+  allergens String[]
+  planId    String?
+  plan      Plan?    @relation(fields: [planId], references: [id])
+  meals     Meal[]
+}
+
+/// A prepaid plan. It completes when every meal is delivered.
+model Subscription {
+  id           String             @id @default(uuid())
+  code         String             @unique
+  customerId   String
+  customer     Customer           @relation(fields: [customerId], references: [id])
+  planId       String
+  plan         Plan               @relation(fields: [planId], references: [id])
+  durationDays Int
+  mealTypes    MealType[]
+  diet         Diet
+  startDate    DateTime           @db.Date
+  originalEnd  DateTime?          @db.Date
+  perMealAddr  Boolean            @default(false)
+  status       SubscriptionStatus @default(PENDING_PAYMENT)
+  couponCode   String?
+  quote        Json
+  source       String             @default("APP") // APP | SHOPIFY | MANUAL
+  createdAt    DateTime           @default(now())
+  activatedAt  DateTime?
+  addresses    SubscriptionAddress[]
+  meals        Meal[]
+  payments     Payment[]
+  invoices     Invoice[]
+}
+
+/// Fixed delivery address per meal type. Only a super admin can correct it.
+model SubscriptionAddress {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  mealType       MealType
+  line1          String
+  landmark       String?
+  city           String
+  pincode        String
+
+  @@unique([subscriptionId, mealType])
+}
+
+/// One entitlement (e.g. THP1001-B007) with its original and revised date and status.
+model Meal {
+  id             String        @id @default(uuid())
+  code           String        @unique
+  subscriptionId String
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  mealType       MealType
+  seq            Int
+  originalDate   DateTime      @db.Date
+  revisedDate    DateTime?     @db.Date
+  status         MealStatus    @default(SCHEDULED)
+  dishId         String?
+  dish           Dish?         @relation(fields: [dishId], references: [id])
+  delivery       DeliveryJob?
+  exceptions     DeliveryException[]
+
+  @@index([originalDate])
+  @@index([revisedDate])
+  @@index([subscriptionId])
+}
+
+/// Delivery of one meal: partner, tracking reference and status.
+model DeliveryJob {
+  id            String         @id @default(uuid())
+  mealId        String         @unique
+  meal          Meal           @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  partner       String?
+  trackingRef   String?
+  status        DeliveryStatus @default(ASSIGNED)
+  failureReason String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+/// A failed delivery. Not a completed meal until an admin resolves it.
+model DeliveryException {
+  id          String          @id @default(uuid())
+  mealId      String
+  meal        Meal            @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  reason      String
+  status      ExceptionStatus @default(OPEN)
+  resolution  String?
+  note        String?
+  resolvedBy  String?
+  createdAt   DateTime        @default(now())
+  resolvedAt  DateTime?
+}
+
+/// A payment attempt for a subscription.
+model Payment {
+  id             String        @id @default(uuid())
+  code           String        @unique
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  amount         Int
+  method         String?
+  status         PaymentStatus @default(PENDING)
+  gatewayRef     String?
+  shopifyOrder   String?
+  createdAt      DateTime      @default(now())
+  invoice        Invoice?
+}
+
+/// GST tax invoice issued for a successful payment.
+model Invoice {
+  id             String       @id @default(uuid())
+  number         String       @unique
+  paymentId      String       @unique
+  payment        Payment      @relation(fields: [paymentId], references: [id])
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  taxable        Int
+  gst            Int
+  total          Int
+  issuedAt       DateTime     @default(now())
+}
+
+/// Percentage discount code.
+model Coupon {
+  code    String  @id
+  percent Int
+  active  Boolean @default(true)
+}
+
+/// Pincodes we deliver to and their zone (A or B).
+model ServicePincode {
+  pincode String @id
+  area    String
+  zone    String // A | B
+}
+
+/// Days the kitchen is closed.
+model Closure {
+  id     String   @id @default(uuid())
+  date   DateTime @unique @db.Date
+  reason String
+}
+
+/// Key-value business settings (pricing rules, operating days, vendor confirmations).
+model Setting {
+  key   String @id
+  value Json
+}
+
+/// Who changed what, old and new value, and the reason.
+model AuditLog {
+  id         String   @id @default(uuid())
+  at         DateTime @default(now())
+  actorId    String?
+  actorLabel String
+  area       String
+  action     String
+  target     String
+  oldValue   String?
+  newValue   String?
+  reason     String?
+
+  @@index([area])
+}
+
+/// Messages queued for customers, admins or the kitchen.
+model Notification {
+  id       String   @id @default(uuid())
+  at       DateTime @default(now())
+  audience String // customer | admin | kitchen
+  channels String[]
+  template String
+  message  String
+}
+
+/// Schedule changes the kitchen must know about.
+model KitchenAlert {
+  id               String   @id @default(uuid())
+  at               DateTime @default(now())
+  message          String
+  subscriptionCode String
+}

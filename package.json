@@ -1,0 +1,34 @@
+{
+  "name": "healthy-pots-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Healthy Pots: prepaid meal-subscription platform (NestJS API + Next.js web + PostgreSQL)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run prisma:generate -w apps/api",
+    "dev": "concurrently -n api,web -c green,cyan \"npm run start:dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev:api": "npm run start:dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "start": "concurrently -n api,web \"npm run start -w apps/api\" \"npm run start -w apps/web\"",
+    "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run prisma:migrate -w apps/api",
+    "db:deploy": "npm run prisma:deploy -w apps/api",
+    "db:seed": "npm run prisma:seed -w apps/api",
+    "db:reset": "npm run prisma:reset -w apps/api",
+    "db:studio": "npm run prisma:studio -w apps/api",
+    "cli": "npm run cli -w apps/api --",
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "free-ports": "node scripts/free-ports.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

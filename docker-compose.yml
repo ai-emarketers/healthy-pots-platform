@@ -1,0 +1,15 @@
+# Local PostgreSQL for development. Start with: npm run db:up
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: healthypots
+      POSTGRES_PASSWORD: healthypots
+      POSTGRES_DB: healthypots
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
