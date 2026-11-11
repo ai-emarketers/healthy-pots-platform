@@ -6,6 +6,7 @@ import { api, useApi, fmtDate, fmtTime, inr, MEAL_LABEL, SEVERITY_LABEL } from '
 import { Button, Card, Field, Loading, Notice, PageHeader, Stat, Stats, StatusBadge, Table } from '@/components/ui';
 import { AllergyForm, AllergyValue, emptyAllergy } from '@/components/AllergyForm';
 import { MealCalendar } from '@/components/customer/MealCalendar';
+import { mapUrl } from '@/lib/maps';
 
 const TABS = ['My Goal & Meals', 'My Meal Schedule', 'Pause Meals', 'Resume Meals', 'Reschedule Meals', 'Track My Delivery', 'Invoices & Payments', 'Allergies & Diet', 'Subscription History'] as const;
 type Tab = (typeof TABS)[number];
@@ -65,7 +66,7 @@ function GoalTab({ d }: { d: any }) {
       <p><strong>{d.plan}</strong> · {d.mealTypes.map((m: string) => MEAL_LABEL[m]).join(', ')} · {d.diet.replace('_', '-')}</p>
       <p className="muted">{fmtDate(d.startDate)} to {fmtDate(d.progress.estimatedFinish)}</p>
       <Table head={['Meal', 'Delivery address (fixed after payment)']}>
-        {d.addresses.map((a: any) => (<tr key={a.id}><td>{MEAL_LABEL[a.mealType]}</td><td>{a.line1}{a.landmark ? `, ${a.landmark}` : ''}, {a.city} {a.pincode}</td></tr>))}
+        {d.addresses.map((a: any) => (<tr key={a.id}><td>{MEAL_LABEL[a.mealType]}</td><td>{a.line1}{a.landmark ? `, ${a.landmark}` : ''}, {a.city} {a.pincode}{' '}<a href={mapUrl(a)} target="_blank" rel="noopener noreferrer">View on map</a></td></tr>))}
       </Table>
       <p className="muted">Addresses are fixed once you pay. Rescheduling changes dates only. Need a correction? Contact support.</p>
     </Card>

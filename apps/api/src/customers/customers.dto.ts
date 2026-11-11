@@ -1,7 +1,7 @@
 /** Request shapes and validation for profile, allergies and addresses. */
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { CITIES, IsPincode, OptionalText, Text } from '../common/validators';
+import { IsArray, IsEmail, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { CITIES, IsPincode, MAP_LINK_RE, OptionalText, Text } from '../common/validators';
 
 /** Request body for: update profile. Unknown fields are stripped and invalid values return 400. */
 export class UpdateProfileDto {
@@ -31,4 +31,5 @@ export class AddressDto {
   @OptionalText(200) landmark?: string;
   @Text(2, 80, 'City') city: string;
   @IsPincode() pincode: string;
+  @IsOptional() @Matches(MAP_LINK_RE, { message: 'Map link must be a web link starting with http:// or https://' }) mapLink?: string;
 }

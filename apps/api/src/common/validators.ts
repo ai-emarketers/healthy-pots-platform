@@ -7,6 +7,8 @@ import { MealType } from '@prisma/client';
 /** Shared patterns. Keep the web forms (apps/web/src/lib/validate.ts) in sync with these. */
 export const PHONE_RE = /^(\+?91[\s-]?)?[6-9]\d{9}$/; // Indian mobile
 export const PINCODE_RE = /^[1-9]\d{5}$/;
+/** Optional map link: any http(s) URL up to 500 characters (Google Maps, maps.app.goo.gl, Apple Maps...). */
+export const MAP_LINK_RE = /^https?:\/\/\S{3,490}$/i;
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const MEAL_TYPES: MealType[] = ['BREAKFAST', 'LUNCH', 'SNACK', 'DINNER'];
 export const CITIES = ['Kolkata', 'Delhi NCR', 'Bangalore', 'Mumbai', 'Pune', 'Hyderabad'];
@@ -26,6 +28,7 @@ export function assertAddress(a: any, label: string) {
   if (!a || typeof a !== 'object') throw bad('address is required');
   if (typeof a.line1 !== 'string' || a.line1.trim().length < 5 || a.line1.length > 200) throw bad('enter the house or flat number and street (5 to 200 characters)');
   if (a.landmark != null && (typeof a.landmark !== 'string' || a.landmark.length > 200)) throw bad('landmark is too long');
+  if (a.mapLink != null && a.mapLink !== '' && !MAP_LINK_RE.test(String(a.mapLink))) throw bad('map link must be a web link starting with http:// or https://');
   if (typeof a.city !== 'string' || a.city.trim().length < 2 || a.city.length > 80) throw bad('city is required');
   if (a.pincode != null && (typeof a.pincode !== 'string' || a.pincode.length > 12)) throw bad('pincode is too long');
 }

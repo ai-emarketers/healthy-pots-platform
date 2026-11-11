@@ -61,8 +61,8 @@ export class CustomersService {
   }
 
   /** Saves a new address for later subscriptions. */
-  async addAddress(u: AuthUser, d: { label: string; line1: string; landmark?: string; city: string; pincode?: string }) {
+  async addAddress(u: AuthUser, d: { label: string; line1: string; landmark?: string; city: string; pincode?: string; mapLink?: string }) {
     const c = await this.byUser(u);
-    return this.prisma.savedAddress.create({ data: { ...d, pincode: d.pincode ?? '', customerId: c.id } });
+    return this.prisma.savedAddress.create({ data: { ...d, pincode: d.pincode ?? '', mapLink: d.mapLink?.trim() || null, customerId: c.id } });
   }
 }

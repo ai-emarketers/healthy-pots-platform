@@ -16,6 +16,7 @@ export interface AddressInput {
   landmark?: string;
   city: string;
   pincode: string;
+  mapLink?: string;
 }
 
 import { CheckoutDto } from './subscriptions.dto';
@@ -85,7 +86,7 @@ export class SubscriptionsService {
     for (const mt of mealTypes) {
       const a = addrFor(mt);
       assertAddress(a, `Delivery address for ${mt.toLowerCase()}`);
-      addresses[mt] = { ...a, pincode: a.pincode ?? '' }; // pincode is optional free text; unknown pincodes are priced as zone A
+      addresses[mt] = { ...a, pincode: a.pincode ?? '', mapLink: a.mapLink?.trim() || undefined }; // pincode is optional free text; unknown pincodes are priced as zone A
     }
 
     const cal = await this.settings.calendar();

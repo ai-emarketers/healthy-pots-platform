@@ -42,6 +42,7 @@ export class DeliveryService {
           id: j.id, meal: j.meal.code, mealType: j.meal.mealType, customer: j.meal.subscription.customer.name,
           phone: j.meal.subscription.customer.phone,
           address: a ? `${a.line1}${a.landmark ? ', ' + a.landmark : ''}, ${a.city} ${a.pincode}` : '',
+          mapLink: a?.mapLink ?? null,
           partner: j.partner, trackingRef: j.trackingRef, status: j.status, next: NEXT[j.status] ?? [],
         };
       }),

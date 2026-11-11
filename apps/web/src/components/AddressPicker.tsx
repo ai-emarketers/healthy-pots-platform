@@ -6,9 +6,10 @@
  */
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { mapUrl } from '@/lib/maps';
 import { Errors, hasErrors } from '@/lib/validate';
 
-export interface Addr { line1: string; landmark: string; city: string; pincode: string }
+export interface Addr { line1: string; landmark: string; city: string; pincode: string; mapLink?: string }
 interface Saved extends Addr { id: string; label: string }
 
 const CITIES = ['Kolkata', 'Delhi NCR', 'Bangalore', 'Mumbai', 'Pune', 'Hyderabad'];
@@ -16,7 +17,7 @@ const TAGS = ['Home', 'Work', 'Other'] as const;
 const ICON: Record<string, string> = { Home: '🏠', Work: '🏢', Other: '📍' };
 const iconFor = (label: string) => ICON[label] ?? ICON.Other;
 
-const blank = { flat: '', floor: '', building: '', street: '', landmark: '', city: 'Kolkata', pincode: '', tag: 'Home' as string, other: '', save: true };
+const blank = { flat: '', floor: '', building: '', street: '', landmark: '', city: 'Kolkata', pincode: '', mapLink: '', tag: 'Home' as string, other: '', save: true };
 
 export function AddressPicker({ value, onChange, saved, onCheck, status, error }: {
   value: Addr; onChange: (a: Addr) => void; saved: Saved[]; onCheck?: () => void; status?: string; error?: string;
@@ -41,15 +42,16 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
       city: f.city.trim() ? '' : 'Choose a city',
       other: f.tag === 'Other' && f.other.trim().length < 2 ? 'Name this address (e.g. Parents)' : '',
     };
+    if (f.mapLink.trim() && !/^https?:\/\/\S{3,}$/i.test(f.mapLink.trim())) e.mapLink = 'Paste a web link that starts with http:// or https://';
     setErrs(e);
     if (hasErrors(e)) return;
     const line1 = [f.flat.trim(), f.floor.trim() && `Floor ${f.floor.trim()}`, f.building.trim(), f.street.trim()].filter(Boolean).join(', ');
-    const a: Addr = { line1, landmark: f.landmark.trim(), city: f.city, pincode: f.pincode.trim() };
+    const a: Addr = { line1, landmark: f.landmark.trim(), city: f.city, pincode: f.pincode.trim(), mapLink: f.mapLink.trim() };
     const label = f.tag === 'Other' ? f.other.trim() : f.tag;
     setBusy(true); setFail('');
     try {
       if (f.save) {
-        const s = await api('/me/addresses', { body: { label, ...a } });
+        const s = await api('/me/addresses', { body: { label, ...a, mapLink: a.mapLink || undefined } });
         setList((l) => [...l, { ...a, id: s.id, label }]);
       }
       onChange(a);
@@ -63,6 +65,7 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
         <div className="addr-now">
           <span className="addr-pin">📍</span>
           <div><strong>Delivering to</strong><div className="muted">{text(value)}</div></div>
+          <a className="btn small ghost" href={mapUrl(value)} target="_blank" rel="noopener noreferrer">View on map</a>
           {onCheck && <button type="button" className="btn small ghost" onClick={onCheck}>Check area</button>}
         </div>
       )}
@@ -71,7 +74,7 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
 
       <div className="addr-cards">
         {list.map((a) => (
-          <button key={a.id} type="button" className={`addr-card ${same(a) ? 'on' : ''}`} onClick={() => onChange({ line1: a.line1, landmark: a.landmark ?? '', city: a.city, pincode: a.pincode ?? '' })}>
+          <button key={a.id} type="button" className={`addr-card ${same(a) ? 'on' : ''}`} onClick={() => onChange({ line1: a.line1, landmark: a.landmark ?? '', city: a.city, pincode: a.pincode ?? '', mapLink: a.mapLink ?? '' })}>
             <span className="addr-ic">{iconFor(a.label)}</span>
             <span className="addr-tx"><strong>{a.label}</strong><small>{text(a)}</small></span>
             <span className="addr-radio" aria-hidden />
@@ -103,6 +106,11 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
                 <label className="field"><span>City *</span><select value={f.city} onChange={(e) => set('city', e.target.value)}>{CITIES.map((c) => <option key={c}>{c}</option>)}</select></label>
                 <label className="field"><span>Pincode (optional)</span><input maxLength={12} inputMode="numeric" value={f.pincode} onChange={(e) => set('pincode', e.target.value)} /></label>
               </div>
+              <label className={`field ${errs.mapLink ? 'has-error' : ''}`}>
+                <span>Google Maps link (optional)</span>
+                <input placeholder="Paste a link from Google Maps" value={f.mapLink} onChange={(e) => set('mapLink', e.target.value)} />
+                {errs.mapLink ? <small className="error-text">{errs.mapLink}</small> : <small className="muted">Helps the rider find you. <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Open Google Maps</a>, drop a pin, tap Share, then paste the link here.</small>}
+              </label>
               <label className="check-item"><input type="checkbox" checked={f.save} onChange={(e) => set('save', e.target.checked)} /> Save this address for next time</label>
               {fail && <small className="error-text" role="alert">{fail}</small>}
             </div>

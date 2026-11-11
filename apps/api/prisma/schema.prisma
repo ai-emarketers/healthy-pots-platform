@@ -139,6 +139,7 @@ model SavedAddress {
   landmark   String?
   city       String
   pincode    String
+  mapLink    String? // optional Google Maps / share link
 }
 
 /// A goal the customer can subscribe to (weight loss, diabetes friendly, ...).
@@ -212,6 +213,7 @@ model SubscriptionAddress {
   landmark       String?
   city           String
   pincode        String
+  mapLink        String? // optional Google Maps / share link
 
   @@unique([subscriptionId, mealType])
 }

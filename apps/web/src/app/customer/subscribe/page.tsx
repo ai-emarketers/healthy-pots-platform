@@ -11,7 +11,7 @@ import { Badge, Button, Card, Field, Loading, Notice, PageHeader, Segmented, Tab
 
 const STEPS = ['Goal', 'About you', 'Your meals', 'Allergies', 'Delivery addresses', 'Meals and price'];
 const DIETS = [['VEG', 'Vegetarian'], ['NON_VEG', 'Non-Vegetarian'], ['EGG', 'Eggetarian'], ['MIXED', 'Mixed day by day']];
-const emptyAddr = { line1: '', landmark: '', city: 'Kolkata', pincode: '' };
+const emptyAddr = { line1: '', landmark: '', city: 'Kolkata', pincode: '', mapLink: '' };
 
 /** Wrapper that provides Suspense for reading ?plan=. */
 export default function SubscribePage() {

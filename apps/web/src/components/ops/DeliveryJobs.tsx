@@ -2,6 +2,7 @@
 /** Delivery job list: assign a partner, advance status, report a failure. */
 import { useState } from 'react';
 import { api, useApi, MEAL_LABEL } from '@/lib/api';
+import { mapUrl } from '@/lib/maps';
 import { Button, Card, Loading, Notice, StatusBadge, Table } from '@/components/ui';
 
 const PARTNERS = ['Shadowfax rider 1', 'Shadowfax rider 2', 'Shadowfax rider 3'];
@@ -19,7 +20,7 @@ export function DeliveryJobs({ date }: { date: string }) {
         {data.jobs.map((j: any) => (
           <tr key={j.id}>
             <td>{j.meal}<small>{MEAL_LABEL[j.mealType]}</small></td>
-            <td>{j.customer}<small>{j.address}</small></td>
+            <td>{j.customer}<small>{j.address}</small><small><a href={mapUrl({ line1: j.address, mapLink: j.mapLink })} target="_blank" rel="noopener noreferrer">Open in Maps</a></small></td>
             <td>
               <select value={j.partner ?? ''} onChange={(e) => act(() => api(`/delivery/jobs/${j.id}/assign`, { body: { partner: e.target.value } }))}>
                 <option value="">Unassigned</option>

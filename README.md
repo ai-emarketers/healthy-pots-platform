@@ -126,3 +126,5 @@ All vendors are stubbed behind small, documented endpoints until they confirm th
 ## My profile
 
 Every role has a profile page at `/profile` (click your name in the sidebar). Customers can edit name, email, city, gender, age, weight and height; their mobile number is their login and is read-only. Staff can edit name and email and change their password. API: `GET/PATCH /api/profile`, `POST /api/profile/password`.
+
+Addresses can carry an optional map link (Google Maps share link). Riders see "Open in Maps"; without a link it falls back to a Google Maps search of the address. After pulling this change run `npm run db:migrate -- --name add_map_link` to add the new column.
