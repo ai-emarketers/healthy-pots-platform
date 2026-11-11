@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AllergyForm, emptyAllergy } from '@/components/AllergyForm';
+import { AddressPicker } from '@/components/AddressPicker';
 import { addressErrors, emailError, Errors, hasErrors, nameError, numberError, pincodeError } from '@/lib/validate';
 import { api, useApi, fmtDate, fmtTime, inr, MEAL_LABEL, SEVERITY_LABEL } from '@/lib/api';
 import { Badge, Button, Card, Field, Loading, Notice, PageHeader, Segmented, Table } from '@/components/ui';
@@ -224,14 +225,15 @@ function Wizard() {
           {(sameAddr ? [orderedMeals[0]] : orderedMeals).map((mt: string) => (
             <div key={mt} style={{ marginTop: 16 }}>
               <h3>{sameAddr ? `All selected meals (${orderedMeals.map((m: string) => MEAL_LABEL[m]).join(', ')})` : MEAL_LABEL[mt]}</h3>
-              {me?.addresses?.length > 0 && <div className="row" style={{ margin: '6px 0' }}><span className="muted">Use a saved address:</span>{me.addresses.map((a: any) => <button key={a.id} className="btn small ghost" onClick={() => setAddr((x) => ({ ...x, [addrKey(mt)]: { line1: a.line1, landmark: a.landmark ?? '', city: a.city, pincode: a.pincode } }))}>{a.label}</button>)}</div>}
-              <div className="grid2">
-                <Field label="House or flat number and street" error={errors[`${addrKey(mt)}.line1`]}><input value={getAddr(mt).line1} onChange={(e) => setAddrField(mt, 'line1', e.target.value)} /></Field>
-                <Field label="Area or landmark"><input value={getAddr(mt).landmark} onChange={(e) => setAddrField(mt, 'landmark', e.target.value)} /></Field>
-                <Field label="City" error={errors[`${addrKey(mt)}.city`]}><input value={getAddr(mt).city} onChange={(e) => setAddrField(mt, 'city', e.target.value)} /></Field>
-                <Field label="Pincode (optional)" error={errors[`${addrKey(mt)}.pincode`]}><input maxLength={12} value={getAddr(mt).pincode} onChange={(e) => setAddrField(mt, 'pincode', e.target.value)} /></Field>
-              </div>
-              <div className="row"><Button small kind="ghost" onClick={() => checkPin(mt)}>Check serviceability</Button><span className="muted">{svc[addrKey(mt)] ?? 'Not checked yet.'}</span></div>
+              <AddressPicker
+                key={`${mt}-${me?.addresses?.length ?? 0}`}
+                value={getAddr(mt)}
+                onChange={(v) => setAddr((x) => ({ ...x, [addrKey(mt)]: v }))}
+                saved={me?.addresses ?? []}
+                onCheck={() => checkPin(mt)}
+                status={svc[addrKey(mt)]}
+                error={errors[`${addrKey(mt)}.line1`] || errors[`${addrKey(mt)}.city`]}
+              />
             </div>
           ))}
           <Notice tone="info">Addresses are fixed once you pay. After payment, rescheduling changes dates only. There is no address editing in the dashboard.</Notice>
