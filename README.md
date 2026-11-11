@@ -122,3 +122,7 @@ All vendors are stubbed behind small, documented endpoints until they confirm th
 - Run `npm run prisma:deploy -w apps/api` for migrations; do not run the demo seed (`SEED_DEMO=false`).
 - Change or delete the seeded staff accounts.
 - Restrict `WEB_ORIGIN` to your web domain.
+
+## My profile
+
+Every role has a profile page at `/profile` (click your name in the sidebar). Customers can edit name, email, city, gender, age, weight and height; their mobile number is their login and is read-only. Staff can edit name and email and change their password. API: `GET/PATCH /api/profile`, `POST /api/profile/password`.

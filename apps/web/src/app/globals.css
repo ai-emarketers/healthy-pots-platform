@@ -21,7 +21,7 @@ a { color: var(--green); text-decoration: none; }
 .side nav a:hover { background: #1b3a2b; } .side nav a.active { background: var(--green); color: #fff; }
 .pill { background: #e0a43a; color: #1c1300; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 7px; }
 .side-foot { border-top: 1px solid #25402f; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-.who { display: flex; flex-direction: column; } .who small { color: #8fb3a0; text-transform: capitalize; }
+.who { display: flex; flex-direction: column; color: inherit; text-decoration: none; } .who small { color: #8fb3a0; text-transform: capitalize; }
 .side .btn.ghost { color: #cfe3d8; border-color: #35553f; }
 .main { padding: 24px 28px 60px; max-width: 1280px; width: 100%; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }

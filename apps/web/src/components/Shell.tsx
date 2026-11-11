@@ -39,10 +39,10 @@ export function Shell({ portal, nav, children, roleSwitchLabel }: { portal: stri
         </nav>
         <div className="side-foot">
           {me && (
-            <div className="who">
+            <Link href="/profile" className="who" title="My profile">
               <strong>{me.name}</strong>
-              <small>{me.role.replace('_', ' ').toLowerCase()}</small>
-            </div>
+              <small>{me.role.replace('_', ' ').toLowerCase()} · My profile</small>
+            </Link>
           )}
           <button className="btn ghost small" onClick={logout}>Log out</button>
         </div>

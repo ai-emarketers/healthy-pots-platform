@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { CoreModule } from './common/core.module';
 import { AuthModule } from './auth/auth.module';
+import { ProfileModule } from './profile/profile.module';
 import { JwtAuthGuard } from './common/jwt-auth.guard';
 import { RolesGuard } from './common/roles.guard';
 import { CatalogModule } from './catalog/catalog.module';
@@ -25,6 +26,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     PrismaModule,
     CoreModule,
     AuthModule,
+    ProfileModule,
     CatalogModule,
     CustomersModule,
     SubscriptionsModule,
