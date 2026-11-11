@@ -13,7 +13,7 @@ export default function AdminKitchen() {
     <>
       <PageHeader title="Kitchen" sub="View and export the production sheet, and update preparation status." />
       <ServiceDate value={when} onChange={setWhen} />
-      <Segmented value={tab} onChange={setTab} options={[{ value: 'sheet', label: 'Production sheet' }, { value: 'board', label: 'Status board' }]} />
+      <Segmented<'sheet' | 'board'> value={tab} onChange={setTab} options={[{ value: 'sheet', label: 'Production sheet' }, { value: 'board', label: 'Status board' }]} />
       <div style={{ marginTop: 14 }}>{tab === 'sheet' ? <ProductionSheet date={dateParam(when)} /> : <KitchenBoard date={dateParam(when)} />}</div>
     </>
   );
