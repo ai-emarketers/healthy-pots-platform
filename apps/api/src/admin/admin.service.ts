@@ -14,6 +14,7 @@ import { CheckoutDto } from '../subscriptions/subscriptions.dto';
 import { assertAddress, assertNumber } from '../common/validators';
 
 @Injectable()
+// Back-office operations
 export class AdminService {
   constructor(
     private prisma: PrismaService,
@@ -25,9 +26,12 @@ export class AdminService {
   ) {}
 
   /** Numbers for the admin home screen: customers, subscriptions, allergy alerts, exceptions, finance and the next production sheet. */
+  // Builds the admin home numbers
   async overview() {
     const cal = await this.settings.calendar();
+    // Next service day still open for changes
     const next = nextBookableDay(cal);
+    // Load everything in parallel
     const [customers, subs, exceptions, fin, audit, openEx, sheet] = await Promise.all([
       this.prisma.customer.findMany(),
       this.prisma.subscription.findMany({ where: { status: { not: 'PENDING_PAYMENT' } } }),
@@ -37,12 +41,17 @@ export class AdminService {
       this.prisma.deliveryException.findMany({ where: { status: 'OPEN' }, include: { meal: true } }),
       this.kitchen.sheet(iso(istToday())),
     ]);
+    // Active subscriptions
     const active = subs.filter((s) => s.status === 'ACTIVE');
+    // Customers with a declared allergy (not NONE / not skipped)
     const withAllergy = customers.filter((c) => c.allergySeverity !== 'NONE' && c.allergySeverity !== 'NOT_DECLARED');
+    // Production sheet of the next bookable day
     const nextSheet = await this.kitchen.sheet(iso(next));
+    // Flat object consumed by the admin dashboard
     return {
       customersWithAllergies: withAllergy.length,
       allergyNotDeclared: customers.filter((c) => c.allergySeverity === 'NOT_DECLARED').length,
+      // Upcoming meals whose dish contains an allergen
       dishConflicts: await this.upcomingConflicts(),
       activeSubscriptions: active.length,
       totalSubscriptions: subs.length,
@@ -53,22 +62,29 @@ export class AdminService {
       failedPayments: fin.failedCount,
       failedAmount: fin.failedAmount,
       collected: fin.collected,
+      // When the next sheet locks and how many meals it has
       nextSheet: { date: iso(next), lockAt: cutoffFor(next).toISOString(), meals: nextSheet.totals.meals, paused: nextSheet.totals.paused },
+      // Open delivery exceptions shown as alerts
       alerts: openEx.map((e) => ({ id: e.id, text: `${e.meal.code}: ${e.reason}. Needs admin investigation.`, at: e.createdAt })),
+      // Last 5 audit entries
       recentAudit: audit,
     };
   }
 
   /** Counts scheduled meals whose dish contains something the customer is allergic to. */
+  // Counts scheduled meals with an allergen clash
   private async upcomingConflicts() {
+    // Scheduled meals of active subscriptions whose customer has allergens
     const meals = await this.prisma.meal.findMany({
       where: { status: 'SCHEDULED', subscription: { status: 'ACTIVE', customer: { NOT: { allergens: { isEmpty: true } } } } },
       include: { dish: true, subscription: { include: { customer: true } } },
     });
+    // Keep only those where dish and allergens overlap
     return meals.filter((m) => allergenConflicts(m.subscription.customer.allergens, m.dish?.allergens ?? []).length).length;
   }
 
   /** All customers with their allergy status and subscription counts. */
+  // Customer list for the admin page
   async customers() {
     const rows = await this.prisma.customer.findMany({ include: { subscriptions: { where: { status: { not: 'PENDING_PAYMENT' } } } }, orderBy: { code: 'asc' } });
     return rows.map((c) => ({
@@ -79,18 +95,22 @@ export class AdminService {
   }
 
   /** Subscriptions for the admin list, optionally filtered by status. */
+  // Subscription list with progress and end date
   async subscriptions(status?: string) {
     const rows = await this.prisma.subscription.findMany({
+      // Filter by status; default hides unpaid subscriptions
       where: status && status !== 'ALL' ? { status: status as any } : { status: { not: 'PENDING_PAYMENT' } },
       include: { customer: true, plan: true, meals: true, payments: true },
       orderBy: { code: 'asc' },
     });
     return rows.map((s) => {
+      // Finished meals (delivered or resolved)
       const delivered = s.meals.filter((m) => m.status === 'DELIVERED' || m.status === 'RESOLVED').length;
       return {
         id: s.id, code: s.code, customer: s.customer.name, plan: s.plan.name, days: s.durationDays, mealTypes: s.mealTypes, diet: s.diet,
         allergy: s.customer.allergySeverity, allergens: s.customer.allergens,
         progress: `${delivered}/${s.meals.length}`, start: iso(s.startDate), originalEnd: s.originalEnd ? iso(s.originalEnd) : null,
+        // Latest effective meal date = current end of the plan
         end: s.meals.length ? iso(s.meals.reduce((mx, m) => (effectiveDate(m) > mx ? effectiveDate(m) : mx), s.startDate)) : null,
         payment: s.payments[0]?.code ?? null, source: s.source, status: s.status,
       };
@@ -98,28 +118,37 @@ export class AdminService {
   }
 
   /** Admin "Create manual subscription": for an existing customer, marked paid manually. */
+  // Admin creates and activates a subscription for a customer
   async manualSubscription(u: AuthUser, customerId: string, dto: CheckoutDto, method = 'MANUAL') {
     const c = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!c) throw new NotFoundException('Customer not found');
+    // Same checkout rules, source = MANUAL
     const r = await this.subs.checkout(u, dto, { customerId, source: 'MANUAL' });
+    // Mark paid straight away
     await this.subs.activatePayment(r.payment.code, { method, actor: u });
     await this.audit.log(u, { area: 'Subscription', action: 'Manual subscription created', target: r.subscription.code, newValue: c.name });
     return r;
   }
 
   /** Customers with declared allergies, plus upcoming dish conflicts to review. */
+  // Allergy overview for active subscriptions
   async allergies() {
     const customers = await this.prisma.customer.findMany({
       include: { subscriptions: { where: { status: 'ACTIVE' }, include: { meals: { where: { status: 'SCHEDULED' }, include: { dish: true } } } } },
     });
+    // One row per active subscription
     const rows = customers.flatMap((c) =>
       c.subscriptions.map((s) => ({
         subscription: s.code, customer: c.name, severity: c.allergySeverity, allergens: c.allergens, notes: c.allergyNotes, dislikes: c.dislikes,
+        // Scheduled meals whose dish clashes with the allergens
         conflicts: s.meals.filter((m) => allergenConflicts(c.allergens, m.dish?.allergens ?? []).length).length,
       })),
     );
+    // Sort severity from most to least serious
     const order = { SEVERE: 0, MODERATE: 1, MILD: 2, NONE: 3, NOT_DECLARED: 4 } as const;
+    // Most severe first
     rows.sort((a, b) => order[a.severity] - order[b.severity]);
+    // Summary counters + rows
     return {
       active: rows.length,
       withAllergies: rows.filter((r) => r.severity !== 'NONE' && r.severity !== 'NOT_DECLARED').length,
@@ -131,18 +160,23 @@ export class AdminService {
   }
 
   /** Swap a conflicting dish for a safe one on a specific meal (admin confirms the swap). */
+  // Replace a dish on one meal
   async swapDish(u: AuthUser, mealId: string, dishId: string, reason: string) {
     const meal = await this.prisma.meal.findUnique({ where: { id: mealId }, include: { dish: true, subscription: { include: { customer: true } } } });
     const dish = await this.prisma.dish.findUnique({ where: { id: dishId } });
     if (!meal || !dish) throw new NotFoundException();
+    // Must be the same meal type
     if (dish.mealType !== meal.mealType) throw new BadRequestException('Dish is for a different meal type');
+    // New dish must not contain the customer's allergens
     if (allergenConflicts(meal.subscription.customer.allergens, dish.allergens).length) throw new BadRequestException('That dish also contains a declared allergen');
+    // Apply the swap
     await this.prisma.meal.update({ where: { id: mealId }, data: { dishId } });
     await this.audit.log(u, { area: 'Allergy', action: 'Dish swapped', target: meal.code, oldValue: meal.dish?.name, newValue: dish.name, reason });
     return { ok: true };
   }
 
   /** Dishes that can replace a meal without triggering the customer's allergens. */
+  // Options for the swap dropdown
   async safeDishes(mealId: string) {
     const meal = await this.prisma.meal.findUnique({ where: { id: mealId }, include: { subscription: { include: { customer: true } } } });
     if (!meal) throw new NotFoundException();
@@ -151,21 +185,28 @@ export class AdminService {
   }
 
   /** Audit log entries, newest first, optionally for one area. */
+  // Audit log newest first, max 300
   async audits(area?: string) {
     return this.prisma.auditLog.findMany({ where: area && area !== 'All' ? { area } : {}, orderBy: { at: 'desc' }, take: 300 });
   }
 
   /** Latest notifications for all audiences. */
+  // Latest 200 notifications
   notifications() {
     return this.prisma.notification.findMany({ orderBy: { at: 'desc' }, take: 200 });
   }
 
   /** Super admin only. Customers cannot change addresses after payment; this fixes errors such as a missing landmark. */
+  // Exceptional address fix (super admin; customers cannot edit after payment)
   async correctAddress(u: AuthUser, b: { subscriptionId: string; mealType: MealType; line1: string; landmark?: string; city: string; pincode?: string; reason?: string }) {
+    // Existing address for that subscription + meal type
     const cur = await this.prisma.subscriptionAddress.findUnique({ where: { subscriptionId_mealType: { subscriptionId: b.subscriptionId, mealType: b.mealType } }, include: { subscription: true } });
     if (!cur) throw new NotFoundException('Address not found');
+    // Turns an address into one line for the audit log
     const fmt = (a: { line1: string; landmark?: string | null; city: string; pincode?: string }) => [a.line1, a.landmark, `${a.city} ${a.pincode}`].filter(Boolean).join(', ');
+    // Save corrected address
     await this.prisma.subscriptionAddress.update({ where: { id: cur.id }, data: { line1: b.line1, landmark: b.landmark, city: b.city, pincode: b.pincode ?? '' } });
+    // Old and new address are recorded with the reason
     await this.audit.log(u, {
       area: 'Address', action: 'Exceptional address correction', target: `${cur.subscription.code} ${MEAL_LABEL[b.mealType]}`,
       oldValue: fmt(cur), newValue: fmt(b), reason: b.reason,
@@ -174,17 +215,22 @@ export class AdminService {
   }
 
   /** Audit entries for address corrections. */
+  // Past corrections come from the audit log
   addressCorrections() {
     return this.prisma.auditLog.findMany({ where: { area: 'Address' }, orderBy: { at: 'desc' } });
   }
 
   /** Fixed delivery addresses of one subscription. */
+  // Addresses of one subscription
   async subscriptionAddresses(subscriptionId: string) {
     return this.prisma.subscriptionAddress.findMany({ where: { subscriptionId } });
   }
 
+  // Business settings used by pricing and scheduling
   // ---------- settings ----------
+  // Everything shown on the Settings page
   async getSettings() {
+    // Load all settings in parallel
     const [pricing, pincodes, closures, plans, operatingDays] = await Promise.all([
       this.settings.pricing(),
       this.prisma.servicePincode.findMany({ orderBy: { area: 'asc' } }),
@@ -192,6 +238,7 @@ export class AdminService {
       this.prisma.plan.findMany({ include: { rates: true }, orderBy: { sort: 'asc' } }),
       this.settings.get<number[]>('operatingDays', [1, 2, 3, 4, 5, 6]),
     ]);
+    // Settings payload (cutoff text is informational, the rule is fixed in code)
     return {
       cutoff: 'Customer changes for next-day meals close at 5:00 PM IST on the previous day (fixed business rule).',
       pricing, operatingDays,
@@ -202,30 +249,40 @@ export class AdminService {
   }
 
   /** Pricing rules: percentages 0-100, amounts and capacity non-negative. */
+  // Validates ranges before saving
   private assertPricing(p: any) {
+    // Percentages must be 0 to 100
     for (const group of ['discount', 'multiMeal'] as const) {
       for (const [k, v] of Object.entries(p[group] ?? {})) assertNumber(v, `${group} ${k}`, 0, 100);
     }
+    // GST percent
     assertNumber(p.gst ?? 0, 'GST', 0, 100);
+    // Money amounts must be non-negative
     for (const k of ['deliveryA', 'deliveryB', 'freeAbove']) if (p[k] != null) assertNumber(p[k], k, 0, 100000);
+    // Kitchen capacity must be at least 1
     if (p.capacity != null) assertNumber(p.capacity, 'capacity', 1, 100000);
   }
 
   /** Saves pricing rules, operating days and the rate card. Each change is audited. */
+  // Saves only the parts that were sent
   async updateSettings(u: AuthUser, b: any) {
+    // Pricing rules
     if (b.pricing) {
       this.assertPricing(b.pricing);
       await this.settings.set('pricing', b.pricing);
       await this.audit.log(u, { area: 'Settings', action: 'Pricing rules updated', target: 'pricing', newValue: JSON.stringify(b.pricing) });
     }
+    // Delivery weekdays
     if (b.operatingDays) {
       await this.settings.set('operatingDays', b.operatingDays);
       await this.audit.log(u, { area: 'Settings', action: 'Operating days updated', target: 'calendar', newValue: b.operatingDays.join(',') });
     }
+    // Plan prices
     if (b.rateCard) {
       for (const r of b.rateCard as { planId: string; rates: Record<MealType, number> }[]) {
         for (const [mealType, price] of Object.entries(r.rates)) {
           assertNumber(Number(price), `Rate for ${mealType.toLowerCase()}`, 1, 100000);
+          // Create or update each plan/meal price
           await this.prisma.rateCard.upsert({
             where: { planId_mealType: { planId: r.planId, mealType: mealType as MealType } },
             create: { planId: r.planId, mealType: mealType as MealType, price: Number(price) },
@@ -239,6 +296,7 @@ export class AdminService {
   }
 
   /** Adds or updates a serviceable pincode and its delivery zone. */
+  // Add or update a serviceable pincode
   async addPincode(u: AuthUser, b: { pincode: string; area: string; zone: 'A' | 'B' }) {
     const r = await this.prisma.servicePincode.upsert({ where: { pincode: b.pincode }, create: b, update: b });
     await this.audit.log(u, { area: 'Settings', action: 'Service pincode saved', target: b.pincode, newValue: `${b.area} / zone ${b.zone}` });
@@ -246,6 +304,7 @@ export class AdminService {
   }
 
   /** Removes a pincode from the service area. */
+  // Stop serving a pincode
   async removePincode(u: AuthUser, pincode: string) {
     await this.prisma.servicePincode.delete({ where: { pincode } });
     await this.audit.log(u, { area: 'Settings', action: 'Service pincode removed', target: pincode });
@@ -253,6 +312,7 @@ export class AdminService {
   }
 
   /** Marks a day as kitchen-closed (no deliveries). */
+  // Close the kitchen on a date (upsert keeps one entry per date)
   async addClosure(u: AuthUser, b: { date: string; reason: string }) {
     const r = await this.prisma.closure.upsert({ where: { date: parseDate(b.date) }, create: { date: parseDate(b.date), reason: b.reason }, update: { reason: b.reason } });
     await this.audit.log(u, { area: 'Settings', action: 'Closure added', target: b.date, newValue: b.reason });
@@ -260,6 +320,7 @@ export class AdminService {
   }
 
   /** Removes a kitchen closure. */
+  // Reopen a date
   async removeClosure(u: AuthUser, id: string) {
     const c = await this.prisma.closure.delete({ where: { id } });
     await this.audit.log(u, { area: 'Settings', action: 'Closure removed', target: iso(c.date) });
@@ -267,20 +328,29 @@ export class AdminService {
   }
 
   /** Records whether a vendor has confirmed a required capability. */
+  // Mark vendor API confirmation as received/pending
   async setConfirmation(u: AuthUser, vendor: string, confirmed: boolean) {
+    // Allowed vendor names
     const known = ['Shopify', 'Petpooja', 'Shadowfax', 'WhatsApp / SMS', 'Accounting'];
     if (!known.includes(vendor)) throw new BadRequestException('Unknown vendor');
+    // Current confirmation map
     const cur = await this.settings.get<Record<string, boolean>>('vendorConfirmations', {});
+    // Save the map
     await this.settings.set('vendorConfirmations', { ...cur, [vendor]: confirmed });
     await this.audit.log(u, { area: 'Integrations', action: confirmed ? 'Vendor confirmation received' : 'Vendor confirmation reopened', target: vendor });
     return this.integrations();
   }
 
   /** Integration overview: responsibilities, webhook endpoints and vendor confirmation status. */
+  // Integration page data
   async integrations() {
+    // Which vendors are confirmed
     const done = await this.settings.get<Record<string, boolean>>('vendorConfirmations', {});
+    // Adds Confirmed/Pending to each vendor item
     const withStatus = (list: { vendor: string; item: string }[]) => list.map((v) => ({ ...v, confirmed: !!done[v.vendor], status: done[v.vendor] ? 'Confirmed' : 'Pending' }));
+    // Static explanation of who does what + live confirmation status
     return {
+      // Responsibilities of each system
       flow: [
         ['Shopify', 'Storefront, plan presentation, customer checkout and payment initiation.'],
         ['Custom backend', 'Single source of truth: subscriptions, individual entitlements, calendar, pause/resume/reschedule, fixed addresses, pricing and delivery coordination.'],
@@ -290,10 +360,12 @@ export class AdminService {
         ['Shadowfax', 'Delivery job creation, tracking and webhooks, subject to vendor API confirmation.'],
         ['Notifications', 'WhatsApp, SMS and email using approved templates.'],
       ],
+      // Webhook URLs to give to vendors
       endpoints: {
         shopifyOrdersPaid: 'POST /api/integrations/shopify/orders-paid  (header x-shopify-hmac-sha256)',
         deliveryWebhook: 'POST /api/integrations/delivery/webhook  (header x-webhook-secret)',
       },
+      // Things each vendor must confirm before go-live
       vendorConfirmations: withStatus([
         { vendor: 'Shopify', item: 'Checkout and payment webhooks, customer authentication and order references' },
         { vendor: 'Petpooja', item: 'Future-dated meal orders, meal-level updates, menu and POS sync' },

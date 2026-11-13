@@ -5,5 +5,6 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
+// Admin wiring; imports the modules whose services it reuses
 @Module({ imports: [FinanceModule, KitchenModule, SubscriptionsModule], controllers: [AdminController], providers: [AdminService] })
 export class AdminModule {}

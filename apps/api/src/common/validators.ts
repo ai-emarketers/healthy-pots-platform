@@ -5,25 +5,39 @@ import { IsArray, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } fr
 import { MealType } from '@prisma/client';
 
 /** Shared patterns. Keep the web forms (apps/web/src/lib/validate.ts) in sync with these. */
+// Indian mobile: optional +91, then 10 digits starting 6 to 9
 export const PHONE_RE = /^(\+?91[\s-]?)?[6-9]\d{9}$/; // Indian mobile
+// 6-digit Indian pincode (not used for validation now, kept for reference)
 export const PINCODE_RE = /^[1-9]\d{5}$/;
 /** Optional map link: any http(s) URL up to 500 characters (Google Maps, maps.app.goo.gl, Apple Maps...). */
+// Any http(s) link, max ~500 chars
 export const MAP_LINK_RE = /^https?:\/\/\S{3,490}$/i;
+// YYYY-MM-DD
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Allowed meal types
 export const MEAL_TYPES: MealType[] = ['BREAKFAST', 'LUNCH', 'SNACK', 'DINNER'];
+// Cities we operate in
 export const CITIES = ['Kolkata', 'Delhi NCR', 'Bangalore', 'Mumbai', 'Pune', 'Hyderabad'];
 
+// DTO decorator: validates a mobile number
 export const IsPhone = () => Matches(PHONE_RE, { message: 'Enter a valid 10-digit Indian mobile number' });
 /** Pincode is free text: no format or serviceability rule is applied. */
+// DTO decorator: pincode is optional free text
 export const IsPincode = () => applyDecorators(IsOptional(), IsString(), MaxLength(12));
+// DTO decorator: validates a date string
 export const IsIsoDate = () => Matches(DATE_RE, { message: 'Date must be YYYY-MM-DD' });
+// DTO decorator: array of valid meal types
 export const IsMealTypes = () => applyDecorators(IsArray(), IsIn(MEAL_TYPES, { each: true, message: 'Unknown meal type' }));
+// DTO decorator: required string with min/max length and friendly messages
 export const Text = (min: number, max: number, label?: string) =>
   applyDecorators(IsString(), MinLength(min, { message: `${label ?? 'This field'} must be at least ${min} characters` }), MaxLength(max, { message: `${label ?? 'This field'} must be at most ${max} characters` }));
+// DTO decorator: optional string with a max length
 export const OptionalText = (max: number) => applyDecorators(IsOptional(), IsString(), MaxLength(max));
 
 /** Throws 400 with a readable message when a plain object (e.g. a map of addresses) is not a valid address. */
+// Manual check for address objects (used where a DTO decorator can't reach)
 export function assertAddress(a: any, label: string) {
+  // Helper that builds a 400 error with a label prefix
   const bad = (m: string) => new BadRequestException(`${label}: ${m}`);
   if (!a || typeof a !== 'object') throw bad('address is required');
   if (typeof a.line1 !== 'string' || a.line1.trim().length < 5 || a.line1.length > 200) throw bad('enter the house or flat number and street (5 to 200 characters)');
@@ -34,6 +48,7 @@ export function assertAddress(a: any, label: string) {
 }
 
 /** Number within [min, max], or 400. */
+// Checks a number lies inside a range
 export function assertNumber(v: any, name: string, min: number, max: number) {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) throw new BadRequestException(`${name} must be a number between ${min} and ${max}`);
 }

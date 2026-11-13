@@ -3,11 +3,14 @@
 import { useApi, fmtTime } from '@/lib/api';
 import { Card, Loading, PageHeader, Table } from '@/components/ui';
 
+// Notification feed
 export default function NotificationsPage() {
+  // Load the latest notifications
   const { data, error, loading } = useApi<any[]>('/admin/notifications');
   return (
     <>
       <PageHeader title="Notifications" sub="Messages sent to customers, admin and kitchen. Customer messages use approved WhatsApp, SMS and email templates once the vendor confirms them." />
+      {/* Loading state or the table (time, audience, channels, template, message) */}
       {!data ? <Loading error={error} loading={loading} /> : (
         <Card>
           <Table head={['Time', 'To', 'Channel', 'Template', 'Message']} empty={data.length ? undefined : 'No notifications yet.'}>

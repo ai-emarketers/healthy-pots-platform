@@ -5,23 +5,30 @@ import { api, useApi, MEAL_LABEL } from '@/lib/api';
 import { mapUrl } from '@/lib/maps';
 import { Button, Card, Loading, Notice, StatusBadge, Table } from '@/components/ui';
 
+// Demo partner list (replace with real rider data later)
 const PARTNERS = ['Shadowfax rider 1', 'Shadowfax rider 2', 'Shadowfax rider 3'];
 
+// Table of today's delivery jobs
 export function DeliveryJobs({ date }: { date: string }) {
+  // Load jobs for the date
   const { data, error, loading, reload } = useApi<any>(`/delivery/jobs?date=${date}`);
   const [err, setErr] = useState('');
+  // Runs an action, shows any error, then reloads the list
   const act = async (fn: () => Promise<any>) => { setErr(''); try { await fn(); await reload(); } catch (e: any) { setErr(e.message); } };
+  // Show loading/error until data arrives
   if (!data) return <Loading error={error} loading={loading} />;
   return (
     <Card title="Delivery jobs">
       <Notice tone="info">One delivery job per meal, created when the kitchen marks it Ready. Partner updates will arrive from the delivery partner by webhook once the vendor confirms its API. These buttons stand in for those updates.</Notice>
       {err && <Notice tone="bad">{err}</Notice>}
+      {/* Columns: meal, customer + address, partner, tracking, status, next step */}
       <Table head={['Meal', 'Customer and address', 'Partner', 'Tracking', 'Status', 'Next step']} empty={data.jobs.length ? undefined : 'No delivery jobs for this date yet. Mark meals Ready on the Kitchen board.'}>
         {data.jobs.map((j: any) => (
           <tr key={j.id}>
             <td>{j.meal}<small>{MEAL_LABEL[j.mealType]}</small></td>
             <td>{j.customer}<small>{j.address}</small><small><a href={mapUrl({ line1: j.address, mapLink: j.mapLink })} target="_blank" rel="noopener noreferrer">Open in Maps</a></small></td>
             <td>
+              {/* Choosing a partner calls the assign endpoint */}
               <select value={j.partner ?? ''} onChange={(e) => act(() => api(`/delivery/jobs/${j.id}/assign`, { body: { partner: e.target.value } }))}>
                 <option value="">Unassigned</option>
                 {PARTNERS.map((p) => <option key={p}>{p}</option>)}
@@ -31,7 +38,9 @@ export function DeliveryJobs({ date }: { date: string }) {
             <td><StatusBadge status={j.status} /></td>
             <td>
               <div className="row">
+                {/* One button per allowed next status (from the API state machine) */}
                 {j.next.map((n: string) =>
+                  // Failed asks for a reason with a prompt
                   n === 'FAILED' ? (
                     <Button key={n} small kind="danger" onClick={() => { const reason = window.prompt('Why did the delivery fail?'); if (reason) act(() => api(`/delivery/jobs/${j.id}/advance`, { body: { status: n, reason } })); }}>Failed</Button>
                   ) : (
@@ -47,12 +56,15 @@ export function DeliveryJobs({ date }: { date: string }) {
   );
 }
 
+// List of failed deliveries; admins can resolve them
 export function Exceptions({ canResolve }: { canResolve: boolean }) {
   const { data, error, loading, reload } = useApi<any[]>('/delivery/exceptions');
   const [err, setErr] = useState('');
   if (!data) return <Loading error={error} loading={loading} />;
+  // Ask for resolution type and reason, then call the API
   const resolve = async (id: string) => {
     const resolution = (window.prompt('Resolution: CREDIT, REDELIVER or WAIVE', 'CREDIT') ?? '').toUpperCase();
+    // Ignore invalid input
     if (!['CREDIT', 'REDELIVER', 'WAIVE'].includes(resolution)) return;
     const note = window.prompt('Reason for the audit log');
     if (!note) return;

@@ -1,15 +1,23 @@
 # Local PostgreSQL for development. Start with: npm run db:up
+# Containers that make up the local dev environment
 services:
+  # PostgreSQL database used by the API (Prisma)
   db:
+    # Small Postgres 16 image
     image: postgres:16-alpine
+    # Auto-start the database again after a reboot
     restart: unless-stopped
+    # Credentials; they must match DATABASE_URL in .env.example
     environment:
       POSTGRES_USER: healthypots
       POSTGRES_PASSWORD: healthypots
       POSTGRES_DB: healthypots
+    # Host port 5433 maps to container 5432 (avoids clashing with a local Postgres)
     ports:
       - "5433:5432"
+    # Keep database files in the named volume pgdata so data survives restarts
     volumes:
       - pgdata:/var/lib/postgresql/data
+# Declares the named volume used above
 volumes:
   pgdata:

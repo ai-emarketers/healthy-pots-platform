@@ -10,14 +10,19 @@ export class FinanceService {
   constructor(private prisma: PrismaService, private subs: SubscriptionsService) {}
 
   /** Demo gateway: lets a customer "pay" in the app. Disabled when PAYMENT_MODE=shopify. */
+  // Pretends the payment succeeded and activates the subscription
   async confirmMock(u: AuthUser, code: string, method = 'UPI') {
+    // Blocked when real payments (Shopify) are used
     if ((process.env.PAYMENT_MODE ?? 'mock') !== 'mock') throw new ForbiddenException('Payments are confirmed by the payment gateway only');
+    // Payment must belong to this customer
     const p = await this.prisma.payment.findUnique({ where: { code } });
     if (!p || p.customerId !== u.customerId) throw new NotFoundException('Payment not found');
+    // Creates meals + invoice (see subscriptions.service)
     return this.subs.activatePayment(code, { method, actor: u });
   }
 
   /** The customer's payments and invoice numbers. */
+  // Customer's payment list
   async myPayments(u: AuthUser) {
     const rows = await this.prisma.payment.findMany({
       where: { customerId: u.customerId },
@@ -31,12 +36,15 @@ export class FinanceService {
   }
 
   /** A GST tax invoice, visible to its owner and to admins. */
+  // One GST invoice
   async invoice(u: AuthUser, number: string) {
+    // Invoice with payment, customer and plan
     const inv = await this.prisma.invoice.findUnique({
       where: { number },
       include: { payment: { include: { customer: true } }, subscription: { include: { plan: true } } },
     });
     if (!inv) throw new NotFoundException('Invoice not found');
+    // Customers may only open their own invoice
     if (u.role === 'CUSTOMER' && inv.payment.customerId !== u.customerId) throw new ForbiddenException();
     return {
       number: inv.number, date: iso(inv.issuedAt), customer: inv.payment.customer.name, subscription: inv.subscription.code,
@@ -45,16 +53,23 @@ export class FinanceService {
   }
 
   /** Collected, failed and pending money plus revenue by plan. */
+  // Admin finance dashboard
   async summary() {
+    // Load all payments and invoices
     const [payments, invoices] = await Promise.all([
       this.prisma.payment.findMany({ include: { customer: true, subscription: { include: { plan: true } } }, orderBy: { createdAt: 'desc' } }),
       this.prisma.invoice.findMany({ include: { subscription: true }, orderBy: { issuedAt: 'desc' } }),
     ]);
+    // Successful payments
     const ok = payments.filter((p) => p.status === 'SUCCESS');
+    // Failed payments
     const failed = payments.filter((p) => p.status === 'FAILED');
+    // Revenue grouped by plan name
     const byPlan: Record<string, number> = {};
     for (const p of ok) if (p.subscription) byPlan[p.subscription.plan.name] = (byPlan[p.subscription.plan.name] ?? 0) + p.amount;
+    // Total money received
     const collected = ok.reduce((s, p) => s + p.amount, 0);
+    // Totals, averages and the table rows for the Finance page
     return {
       collected, payments: ok.length, gstTotal: invoices.reduce((s, i) => s + i.gst, 0), invoices: invoices.length,
       failedCount: failed.length, failedAmount: failed.reduce((s, p) => s + p.amount, 0),

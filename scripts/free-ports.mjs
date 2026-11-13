@@ -3,12 +3,17 @@
  *   npm run free-ports
  * Only stops processes named "node", so it will not touch other apps.
  */
+// Runs shell commands and returns their output
 import { execSync } from 'node:child_process';
 
+// Dev ports to clear: 3000 = web, 4000 = API
 const PORTS = [3000, 4000];
+// Windows and macOS/Linux need different commands
 const win = process.platform === 'win32';
+// Run a command, return its output, or an empty string on any error
 const sh = (c) => { try { return execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return ''; } };
 
+// Find the process IDs listening on a port (netstat on Windows, lsof elsewhere)
 function pidsOnPort(port) {
   if (win) {
     return [...new Set(sh('netstat -ano -p tcp').split(/\r?\n/)
@@ -17,12 +22,15 @@ function pidsOnPort(port) {
   }
   return [...new Set(sh(`lsof -ti tcp:${port} -sTCP:LISTEN`).split('\n').filter(Boolean))];
 }
+// Look up a process name so only node processes are ever killed
 function nameOf(pid) {
   if (win) return (sh(`tasklist /FI "PID eq ${pid}" /FO CSV /NH`).split('","')[0] || '').replace(/"/g, '').toLowerCase();
   return sh(`ps -p ${pid} -o comm=`).trim().toLowerCase();
 }
 
+// Counter of stopped processes for the final message
 let freed = 0;
+// Check each dev port in turn
 for (const port of PORTS) {
   for (const pid of pidsOnPort(port)) {
     const name = nameOf(pid);

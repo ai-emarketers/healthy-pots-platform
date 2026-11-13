@@ -4,21 +4,27 @@ import { useState } from 'react';
 import { api, useApi, MEAL_LABEL } from '@/lib/api';
 import { Badge, Button, Card, Loading, Notice, StatusBadge } from '@/components/ui';
 
+// Cards for every meal with start / ready buttons
 export function KitchenBoard({ date }: { date: string }) {
+  // Selected meal-type tab ('' = all)
   const [meal, setMeal] = useState('');
   const { data, error, loading, reload } = useApi<any>(`/kitchen/board?date=${date}${meal ? `&mealType=${meal}` : ''}`);
   const [err, setErr] = useState('');
+  // Run an action, show errors, reload
   const act = async (fn: () => Promise<any>) => { setErr(''); try { await fn(); await reload(); } catch (e: any) { setErr(e.message); } };
   if (!data) return <Loading error={error} loading={loading} />;
+  // Number of meals per status
   const counts = data.meals.reduce((a: any, m: any) => ({ ...a, [m.status]: (a[m.status] ?? 0) + 1 }), {});
 
   return (
     <>
+      {/* Meal type tabs */}
       <div className="tabs">
         {[['', 'All meals'], ['BREAKFAST', 'Breakfast'], ['LUNCH', 'Lunch'], ['SNACK', 'Snack'], ['DINNER', 'Dinner']].map(([v, l]) => (
           <button key={v} className={meal === v ? 'on' : ''} onClick={() => setMeal(v)}>{l}</button>
         ))}
       </div>
+      {/* Bulk buttons: start / ready for a whole meal type */}
       <div className="row" style={{ marginBottom: 12 }}>
         {['BREAKFAST', 'LUNCH', 'SNACK', 'DINNER'].map((mt) => (
           <span key={mt} className="row">
@@ -31,15 +37,19 @@ export function KitchenBoard({ date }: { date: string }) {
       <div className="row" style={{ marginBottom: 10 }}>
         {Object.entries(counts).map(([k, v]) => (<span key={k} className="muted">{k.replace(/_/g, ' ').toLowerCase()} {String(v)}</span>))}
       </div>
+      {/* One card per meal */}
       <div className="choice-grid">
         {data.meals.map((m: any) => (
           <Card key={m.id}>
             <div className="row" style={{ justifyContent: 'space-between' }}><Badge tone="info">{MEAL_LABEL[m.mealType]}</Badge><StatusBadge status={m.status} /></div>
             <strong style={{ display: 'block', marginTop: 8 }}>{m.dish}</strong>
             <small className="muted">{m.customer} · {m.code}</small>
+            {/* Allergy badge */}
             {m.allergy && <div style={{ marginTop: 6 }}><Badge tone={m.allergy.startsWith('Allergy not') ? 'warn' : 'bad'}>{m.allergy}</Badge></div>}
+            {/* Red warning when the dish contains the customer's allergen */}
             {m.contains?.length > 0 && <Notice tone="bad">CONTAINS {m.contains.join(', ')}</Notice>}
             <div className="row" style={{ marginTop: 8 }}>
+              {/* Start button only for scheduled meals */}
               {m.status === 'SCHEDULED' && <Button small onClick={() => act(() => api(`/kitchen/meals/${m.id}/status`, { body: { status: 'PREPARING' } }))}>Start preparing</Button>}
               {(m.status === 'SCHEDULED' || m.status === 'PREPARING') && <Button small kind="ghost" onClick={() => act(() => api(`/kitchen/meals/${m.id}/status`, { body: { status: 'READY' } }))}>Mark ready</Button>}
             </div>

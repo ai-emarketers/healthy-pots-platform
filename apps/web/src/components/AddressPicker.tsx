@@ -9,51 +9,77 @@ import { api } from '@/lib/api';
 import { mapUrl } from '@/lib/maps';
 import { Errors, hasErrors } from '@/lib/validate';
 
+// Address shape used by the API
 export interface Addr { line1: string; landmark: string; city: string; pincode: string; mapLink?: string }
+// A saved address (has id and label)
 interface Saved extends Addr { id: string; label: string }
 
+// City dropdown options
 const CITIES = ['Kolkata', 'Delhi NCR', 'Bangalore', 'Mumbai', 'Pune', 'Hyderabad'];
+// Address labels offered in the sheet
 const TAGS = ['Home', 'Work', 'Other'] as const;
+// Emoji per label
 const ICON: Record<string, string> = { Home: '🏠', Work: '🏢', Other: '📍' };
+// Icon for a label (custom names use the "Other" pin)
 const iconFor = (label: string) => ICON[label] ?? ICON.Other;
 
+// Empty form for the "Add new address" sheet
 const blank = { flat: '', floor: '', building: '', street: '', landmark: '', city: 'Kolkata', pincode: '', mapLink: '', tag: 'Home' as string, other: '', save: true };
 
+// Component: choose a saved address or add a new one
 export function AddressPicker({ value, onChange, saved, onCheck, status, error }: {
   value: Addr; onChange: (a: Addr) => void; saved: Saved[]; onCheck?: () => void; status?: string; error?: string;
 }) {
+  // Saved addresses (grows when a new one is saved)
   const [list, setList] = useState<Saved[]>(saved);
+  // Is the add-address sheet open?
   const [open, setOpen] = useState(false);
+  // Form values of the sheet
   const [f, setF] = useState({ ...blank });
+  // Field errors
   const [errs, setErrs] = useState<Errors>({});
+  // True while saving
   const [busy, setBusy] = useState(false);
+  // Server error text
   const [fail, setFail] = useState('');
 
+  // Has an address been picked yet?
   const chosen = value.line1.trim().length > 0;
+  // Is this saved address the currently selected one?
   const same = (a: Addr) => a.line1 === value.line1 && a.city === value.city && (a.pincode ?? '') === (value.pincode ?? '');
+  // Update one form field
   const set = (k: string, v: any) => setF((p) => ({ ...p, [k]: v }));
+  // One-line readable version of an address
   const text = (a: Addr) => [a.line1, a.landmark, `${a.city}${a.pincode ? ' ' + a.pincode : ''}`].filter(Boolean).join(', ');
 
   /** Validates the sheet, optionally saves for next time, then selects the address. */
+  // Validate the form, optionally save it, then select it
   async function submit() {
+    // Required-field checks
     const e: Errors = {
       flat: f.flat.trim() ? '' : 'Enter the flat / house number',
       street: f.street.trim().length >= 3 ? '' : 'Enter the street or area',
       city: f.city.trim() ? '' : 'Choose a city',
       other: f.tag === 'Other' && f.other.trim().length < 2 ? 'Name this address (e.g. Parents)' : '',
     };
+    // Map link must be a web link if given
     if (f.mapLink.trim() && !/^https?:\/\/\S{3,}$/i.test(f.mapLink.trim())) e.mapLink = 'Paste a web link that starts with http:// or https://';
     setErrs(e);
+    // Stop and show errors
     if (hasErrors(e)) return;
+    // Combine flat, floor, building and street into one address line
     const line1 = [f.flat.trim(), f.floor.trim() && `Floor ${f.floor.trim()}`, f.building.trim(), f.street.trim()].filter(Boolean).join(', ');
     const a: Addr = { line1, landmark: f.landmark.trim(), city: f.city, pincode: f.pincode.trim(), mapLink: f.mapLink.trim() };
+    // "Home"/"Work" or the custom name
     const label = f.tag === 'Other' ? f.other.trim() : f.tag;
     setBusy(true); setFail('');
     try {
+      // Save to the customer's address book through the API
       if (f.save) {
         const s = await api('/me/addresses', { body: { label, ...a, mapLink: a.mapLink || undefined } });
         setList((l) => [...l, { ...a, id: s.id, label }]);
       }
+      // Tell the parent which address was chosen
       onChange(a);
       setOpen(false); setF({ ...blank });
     } catch (x: any) { setFail(x.message); } finally { setBusy(false); }
@@ -61,6 +87,7 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
 
   return (
     <div className="addr-picker">
+      {/* Summary of the chosen address with map and "check area" buttons */}
       {chosen && (
         <div className="addr-now">
           <span className="addr-pin">📍</span>
@@ -72,7 +99,9 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
       {status && <div className="muted addr-status">{status}</div>}
       {error && <small className="error-text" role="alert">{error}</small>}
 
+      {/* Saved address cards + "Add new" card */}
       <div className="addr-cards">
+        {/* One card per saved address; clicking selects it */}
         {list.map((a) => (
           <button key={a.id} type="button" className={`addr-card ${same(a) ? 'on' : ''}`} onClick={() => onChange({ line1: a.line1, landmark: a.landmark ?? '', city: a.city, pincode: a.pincode ?? '', mapLink: a.mapLink ?? '' })}>
             <span className="addr-ic">{iconFor(a.label)}</span>
@@ -86,6 +115,7 @@ export function AddressPicker({ value, onChange, saved, onCheck, status, error }
         </button>
       </div>
 
+      {/* Bottom sheet for adding a new address */}
       {open && (
         <div className="sheet-back" onClick={() => !busy && setOpen(false)}>
           <div className="sheet" role="dialog" aria-label="Add new address" onClick={(e) => e.stopPropagation()}>

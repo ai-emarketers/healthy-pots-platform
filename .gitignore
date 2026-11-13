@@ -1,8 +1,15 @@
+# Installed packages (recreated by npm install)
 node_modules/
+# Compiled API output
 dist/
+# Next.js build cache
 .next/
+# Secrets and local config: never commit
 .env
 .env.local
+# Log files
 *.log
+# macOS folder metadata
 .DS_Store
+# Test coverage reports
 coverage/

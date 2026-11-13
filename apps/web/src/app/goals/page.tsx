@@ -5,7 +5,9 @@ import { useApi, inr } from '@/lib/api';
 import { Loading } from '@/components/ui';
 
 /** Public goal browser (the prototype's "Skip for now and browse goals"). Subscribing needs a login. */
+// Public page: browse goals without logging in
 export default function GoalsPage() {
+  // Load plans from the public catalog API
   const { data, error, loading } = useApi<any>('/catalog/plans');
   return (
     <div className="login-wrap" style={{ alignItems: 'start' }}>
@@ -14,16 +16,20 @@ export default function GoalsPage() {
           <div className="brand big">The Healthy Pots<small>Meal subscriptions</small></div>
           <Link href="/login" className="btn primary">Log in to subscribe</Link>
         </div>
+        {/* Page intro */}
         <h1>Tell us your goal</h1>
         <p className="muted">We cook, schedule and deliver the meals. Choose a goal, then log in to pick your meals and delivery addresses.</p>
+        {/* Loading state, otherwise the goal lists (GOAL first, then HEALTH) */}
         {!data ? <Loading error={error} loading={loading} /> : (
           ['GOAL', 'HEALTH'].map((g) => (
             <div key={g}>
               <h2 style={{ marginTop: 18 }}>{g === 'GOAL' ? 'What is your goal?' : 'Health-condition goals'}</h2>
               <div className="choice-grid">
                 {data.plans.filter((p: any) => p.group === g).map((p: any) => (
+                  // Clicking a goal opens the subscribe builder with that plan pre-selected (login is required there)
                   <Link key={p.slug} href={`/customer/subscribe?plan=${p.slug}`} className="choice">
                     <strong>{p.name}</strong><small>{p.description}</small>
+                    {/* Show the cheapest meal price for the plan */}
                     <small>From {inr(Math.min(...(Object.values(p.rates) as number[])))} per meal</small>
                   </Link>
                 ))}
@@ -31,6 +37,7 @@ export default function GoalsPage() {
             </div>
           ))
         )}
+        {/* Short explanation of the flow */}
         <h2 style={{ marginTop: 22 }}>How it works</h2>
         <ol className="muted">
           <li>Choose your goal. It is picked once, here.</li>

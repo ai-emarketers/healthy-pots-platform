@@ -3,6 +3,7 @@
 import { Field } from '@/components/ui';
 import { SEVERITY_LABEL } from '@/lib/api';
 
+// Form state for the allergy section
 export interface AllergyValue {
   status: 'NONE' | 'HAS' | 'SKIP';
   allergens: string[];
@@ -12,19 +13,25 @@ export interface AllergyValue {
   notes: string;
 }
 
+// Default state: "skip for now"
 export const emptyAllergy: AllergyValue = { status: 'SKIP', allergens: [], other: '', severity: 'MODERATE', dislikes: '', notes: '' };
 
+// Radio options for the top question
 const STATUS: [AllergyValue['status'], string][] = [
   ['HAS', 'I have an allergy or intolerance'],
   ['NONE', 'No allergies'],
   ['SKIP', 'Skip for now'],
 ];
 
+// Component: allergy and diet form (controlled by its parent through value/onChange)
 export function AllergyForm({ value, options, onChange, error }: { value: AllergyValue; options: string[]; onChange: (v: AllergyValue) => void; error?: string }) {
+  // Merge a partial change into the value
   const set = (patch: Partial<AllergyValue>) => onChange({ ...value, ...patch });
+  // Add/remove one allergen in the list
   const toggle = (a: string) => set({ allergens: value.allergens.includes(a) ? value.allergens.filter((x) => x !== a) : [...value.allergens, a] });
   return (
     <div className="allergy-form">
+      {/* Question: do you have allergies? */}
       <fieldset className="check-group">
         <legend>Do you have any food allergies?</legend>
         {STATUS.map(([v, label]) => (
@@ -32,6 +39,7 @@ export function AllergyForm({ value, options, onChange, error }: { value: Allerg
         ))}
       </fieldset>
 
+      {/* Allergen checkboxes and severity only appear when "I have an allergy" is chosen */}
       {value.status === 'HAS' && (
         <>
           <fieldset className="check-group">
@@ -55,9 +63,11 @@ export function AllergyForm({ value, options, onChange, error }: { value: Allerg
         </>
       )}
 
+      {/* Dislikes (not allergies) */}
       <Field label="Foods you simply prefer to avoid" hint="Dislikes and diet choices, not allergies.">
         <input value={value.dislikes} maxLength={300} onChange={(e) => set({ dislikes: e.target.value })} />
       </Field>
+      {/* Free-text note for the kitchen */}
       <Field label="Anything else the kitchen should know" hint="For example cross-contact, a separate bag, or an emergency medicine you carry.">
         <textarea rows={2} value={value.notes} maxLength={500} onChange={(e) => set({ notes: e.target.value })} />
       </Field>

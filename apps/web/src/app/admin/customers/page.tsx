@@ -3,11 +3,14 @@
 import { useApi, SEVERITY_LABEL } from '@/lib/api';
 import { Card, Loading, PageHeader, StatusBadge, Table } from '@/components/ui';
 
+// Customer list for admins
 export default function CustomersPage() {
+  // Load customers
   const { data, error, loading } = useApi<any[]>('/admin/customers');
   return (
     <>
       <PageHeader title="Customers" sub="Profiles and contact details" />
+      {/* Loading state or the table (allergy badge shows severity + allergens) */}
       {!data ? <Loading error={error} loading={loading} /> : (
         <Card>
           <Table head={['ID', 'Name', 'Mobile', 'Email', 'Subscriptions', 'Allergies (default)']}>

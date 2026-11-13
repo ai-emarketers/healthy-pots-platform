@@ -1,12 +1,15 @@
+// Generates the typed Prisma client (@prisma/client) used by every service
 generator client {
   provider = "prisma-client-js"
 }
 
+// PostgreSQL database; the connection string comes from DATABASE_URL in apps/api/.env
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// Who a user is; decides which portal and which API routes they can use
 enum Role {
   CUSTOMER
   OPERATIONS
@@ -14,6 +17,7 @@ enum Role {
   SUPER_ADMIN
 }
 
+// The four meals a day
 enum MealType {
   BREAKFAST
   LUNCH
@@ -21,6 +25,7 @@ enum MealType {
   DINNER
 }
 
+// Customer diet choice / dish type
 enum Diet {
   VEG
   NON_VEG
@@ -28,6 +33,7 @@ enum Diet {
   MIXED
 }
 
+// NOT_DECLARED = skipped the question, NONE = no allergies, others = declared severity
 enum AllergySeverity {
   NOT_DECLARED
   NONE
@@ -36,6 +42,7 @@ enum AllergySeverity {
   SEVERE
 }
 
+// Life of a plan: unpaid -> active -> completed (or cancelled)
 enum SubscriptionStatus {
   PENDING_PAYMENT
   ACTIVE
@@ -43,6 +50,7 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+// Life of one meal: scheduled -> preparing -> ready -> out for delivery -> delivered (PAUSED / EXCEPTION / RESOLVED are side paths)
 enum MealStatus {
   SCHEDULED
   PAUSED
@@ -54,6 +62,7 @@ enum MealStatus {
   RESOLVED
 }
 
+// Steps of a delivery job
 enum DeliveryStatus {
   ASSIGNED
   PICKED_UP
@@ -62,37 +71,47 @@ enum DeliveryStatus {
   FAILED
 }
 
+// Payment result
 enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
 }
 
+// A failed delivery is OPEN until an admin RESOLVES it
 enum ExceptionStatus {
   OPEN
   RESOLVED
 }
 
 /// Atomic counters for readable IDs (customer C1001, subscription THP1001, invoices).
+// Sequence numbers for readable ids (see PrismaService.nextCounter)
 model Counter {
   key   String @id
   value Int
 }
 
 /// Login identity. Customers use phone and OTP; staff use email and password.
+// Login account for every role
 model User {
   id           String    @id @default(uuid())
   role         Role
   name         String
+  // Staff log in with email (unique)
   email        String?   @unique
+  // Customers log in with phone (unique)
   phone        String?   @unique
+  // bcrypt hash; empty for customers (they use OTP)
   passwordHash String?
+  // false = login disabled
   active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
+  // One-to-one link to the customer profile (customers only)
   customer     Customer?
 }
 
 /// One-time passwords (hashed, expiring, attempt-limited).
+// One-time passwords: stored hashed, expire, and count wrong attempts
 model OtpCode {
   id        String    @id @default(uuid())
   phone     String
@@ -102,13 +121,17 @@ model OtpCode {
   attempts  Int       @default(0)
   createdAt DateTime  @default(now())
 
+  // Fast lookup of a phone's recent OTPs
   @@index([phone, createdAt])
 }
 
 /// Customer profile, body details and allergy declaration.
+// Customer profile, body details and allergy declaration
 model Customer {
   id              String          @id @default(uuid())
+  // Readable id like C1001
   code            String          @unique
+  // Link to the login user
   userId          String          @unique
   user            User            @relation(fields: [userId], references: [id])
   name            String
@@ -120,16 +143,19 @@ model Customer {
   weightKg        Float?
   heightCm        Float?
   allergySeverity AllergySeverity @default(NOT_DECLARED)
+  // List of allergens the customer avoids
   allergens       String[]
   allergyNotes    String?
   dislikes        String?
   createdAt       DateTime        @default(now())
+  // All plans bought by this customer
   subscriptions   Subscription[]
   addresses       SavedAddress[]
   payments        Payment[]
 }
 
 /// Addresses a customer saved for reuse. Subscription addresses are copied and fixed after payment.
+// Address book for reuse at checkout
 model SavedAddress {
   id         String   @id @default(uuid())
   customerId String
@@ -143,12 +169,16 @@ model SavedAddress {
 }
 
 /// A goal the customer can subscribe to (weight loss, diabetes friendly, ...).
+// A goal (weight loss, keto, ...)
 model Plan {
   id          String         @id @default(uuid())
+  // URL-friendly id like weight-loss
   slug        String         @unique
   name        String
+  // GOAL or HEALTH (grouping on the goals page)
   grp         String // GOAL | HEALTH
   description String
+  // Display order
   sort        Int            @default(0)
   rates       RateCard[]
   subs        Subscription[]
@@ -156,44 +186,55 @@ model Plan {
 }
 
 /// Price per meal type for a plan.
+// Price of each meal type for each plan
 model RateCard {
   planId   String
   plan     Plan     @relation(fields: [planId], references: [id])
   mealType MealType
   price    Int
 
+  // Composite key: one price per plan + meal type
   @@id([planId, mealType])
 }
 
 /// A dish with diet type and allergens, used for meal assignment and swaps.
+// Menu item with its diet and allergens
 model Dish {
   id        String   @id @default(uuid())
   name      String
   mealType  MealType
   diet      Diet
   allergens String[]
+  // Optional: dish belongs to one plan, or null = available to all plans
   planId    String?
   plan      Plan?    @relation(fields: [planId], references: [id])
   meals     Meal[]
 }
 
 /// A prepaid plan. It completes when every meal is delivered.
+// A prepaid plan bought by a customer
 model Subscription {
   id           String             @id @default(uuid())
+  // Readable id like THP1001
   code         String             @unique
   customerId   String
   customer     Customer           @relation(fields: [customerId], references: [id])
   planId       String
   plan         Plan               @relation(fields: [planId], references: [id])
+  // Number of delivery days bought
   durationDays Int
   mealTypes    MealType[]
   diet         Diet
+  // First delivery day (date only, no time)
   startDate    DateTime           @db.Date
+  // Planned last day, set when activated
   originalEnd  DateTime?          @db.Date
   perMealAddr  Boolean            @default(false)
   status       SubscriptionStatus @default(PENDING_PAYMENT)
   couponCode   String?
+  // Saved price breakdown at purchase time
   quote        Json
+  // Where it was created: APP, SHOPIFY or MANUAL
   source       String             @default("APP") // APP | SHOPIFY | MANUAL
   createdAt    DateTime           @default(now())
   activatedAt  DateTime?
@@ -204,6 +245,7 @@ model Subscription {
 }
 
 /// Fixed delivery address per meal type. Only a super admin can correct it.
+// Delivery address per meal type, fixed after payment
 model SubscriptionAddress {
   id             String       @id @default(uuid())
   subscriptionId String
@@ -215,10 +257,12 @@ model SubscriptionAddress {
   pincode        String
   mapLink        String? // optional Google Maps / share link
 
+  // Only one address per meal type per subscription
   @@unique([subscriptionId, mealType])
 }
 
 /// One entitlement (e.g. THP1001-B007) with its original and revised date and status.
+// One meal entitlement (e.g. THP1001-B007)
 model Meal {
   id             String        @id @default(uuid())
   code           String        @unique
@@ -226,7 +270,9 @@ model Meal {
   subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   mealType       MealType
   seq            Int
+  // Date first planned
   originalDate   DateTime      @db.Date
+  // New date after pause/resume or reschedule (null = never moved)
   revisedDate    DateTime?     @db.Date
   status         MealStatus    @default(SCHEDULED)
   dishId         String?
@@ -234,14 +280,17 @@ model Meal {
   delivery       DeliveryJob?
   exceptions     DeliveryException[]
 
+  // Speeds up "meals for this day" queries
   @@index([originalDate])
   @@index([revisedDate])
   @@index([subscriptionId])
 }
 
 /// Delivery of one meal: partner, tracking reference and status.
+// Delivery of one meal
 model DeliveryJob {
   id            String         @id @default(uuid())
+  // One job per meal
   mealId        String         @unique
   meal          Meal           @relation(fields: [mealId], references: [id], onDelete: Cascade)
   partner       String?
@@ -253,6 +302,7 @@ model DeliveryJob {
 }
 
 /// A failed delivery. Not a completed meal until an admin resolves it.
+// Record of a failed delivery and how admin resolved it
 model DeliveryException {
   id          String          @id @default(uuid())
   mealId      String
@@ -267,6 +317,7 @@ model DeliveryException {
 }
 
 /// A payment attempt for a subscription.
+// A payment attempt (pending until confirmed)
 model Payment {
   id             String        @id @default(uuid())
   code           String        @unique
@@ -284,6 +335,7 @@ model Payment {
 }
 
 /// GST tax invoice issued for a successful payment.
+// GST invoice created when a payment succeeds
 model Invoice {
   id             String       @id @default(uuid())
   number         String       @unique
@@ -298,6 +350,7 @@ model Invoice {
 }
 
 /// Percentage discount code.
+// Discount code with a percentage
 model Coupon {
   code    String  @id
   percent Int
@@ -305,6 +358,7 @@ model Coupon {
 }
 
 /// Pincodes we deliver to and their zone (A or B).
+// Serviceable pincodes with their zone
 model ServicePincode {
   pincode String @id
   area    String
@@ -312,6 +366,7 @@ model ServicePincode {
 }
 
 /// Days the kitchen is closed.
+// Dates the kitchen is closed
 model Closure {
   id     String   @id @default(uuid())
   date   DateTime @unique @db.Date
@@ -319,12 +374,14 @@ model Closure {
 }
 
 /// Key-value business settings (pricing rules, operating days, vendor confirmations).
+// Key/value settings stored as JSON
 model Setting {
   key   String @id
   value Json
 }
 
 /// Who changed what, old and new value, and the reason.
+// History of important changes (who, what, old, new, why)
 model AuditLog {
   id         String   @id @default(uuid())
   at         DateTime @default(now())
@@ -341,6 +398,7 @@ model AuditLog {
 }
 
 /// Messages queued for customers, admins or the kitchen.
+// Messages queued for customers, admins or the kitchen
 model Notification {
   id       String   @id @default(uuid())
   at       DateTime @default(now())
@@ -351,6 +409,7 @@ model Notification {
 }
 
 /// Schedule changes the kitchen must know about.
+// Alerts shown to the kitchen about schedule changes
 model KitchenAlert {
   id               String   @id @default(uuid())
   at               DateTime @default(now())

@@ -4,36 +4,56 @@ import { useEffect, useState } from 'react';
 import { api, useApi, MEAL_LABEL } from '@/lib/api';
 import { Button, Card, Field, Loading, Notice, PageHeader, Table } from '@/components/ui';
 
+// Weekday names, index 0 = Sunday (same as the API)
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Business settings; only the super admin can edit
 export default function SettingsPage() {
+  // Current user
   const { data: me } = useApi<any>('/auth/me');
+  // Load all settings
   const { data, error, loading, reload } = useApi<any>('/admin/settings');
+  // Editable copy of the pricing rules
   const [pricing, setPricing] = useState<any>(null);
+  // Editable copy of the rate card
   const [rates, setRates] = useState<any[]>([]);
+  // Editable operating weekdays
   const [days, setDays] = useState<number[]>([]);
+  // New pincode form
   const [pin, setPin] = useState({ pincode: '', area: '', zone: 'A' });
+  // New closure form
   const [closure, setClosure] = useState({ date: '', reason: '' });
+  // Result banner
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+  // Inputs are disabled for anyone but the super admin
   const canEdit = me?.user?.role === 'SUPER_ADMIN';
 
+  // Copy loaded settings into editable state
   useEffect(() => { if (data) { setPricing(structuredClone(data.pricing)); setRates(structuredClone(data.rateCard)); setDays(data.operatingDays); } }, [data]);
+  // Wait for data
   if (!data || !pricing) return <Loading error={error} loading={loading} />;
 
+  // Run a save, show a success/error banner, reload
   const run = async (fn: () => Promise<any>, ok = 'Saved') => { try { await fn(); setMsg({ tone: 'good', text: ok }); await reload(); } catch (e: any) { setMsg({ tone: 'bad', text: e.message }); } };
+  // Set a nested pricing value by path (e.g. ['discount','14'])
   const setP = (path: string[], v: number) => setPricing((p: any) => { const c = structuredClone(p); let o = c; path.slice(0, -1).forEach((k) => (o = o[k])); o[path[path.length - 1]] = v; return c; });
+  // Text box value to number ('' = 0)
   const num = (v: string) => (v === '' ? 0 : Number(v));
 
   return (
     <>
+      {/* Title (read-only note for non-super admins) */}
       <PageHeader title="Settings" sub={canEdit ? 'Service area, operating days, rate card and pricing rules.' : 'Read only. Only a super admin can change settings.'} />
+      {/* The fixed cutoff rule text */}
       <Notice tone="info">{data.cutoff}</Notice>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
 
+      {/* Pincodes and zones */}
       <Card title="Service area">
         <Table head={['Pincode', 'Area', 'Zone', '']}>
           {data.pincodes.map((p: any) => (<tr key={p.pincode}><td>{p.pincode}</td><td>{p.area}</td><td>{p.zone}</td><td>{canEdit && <Button small kind="ghost" onClick={() => run(() => api(`/admin/settings/pincodes/${p.pincode}`, { method: 'DELETE' }), 'Removed')}>Remove</Button>}</td></tr>))}
         </Table>
+        {/* Add-pincode form (super admin only) */}
         {canEdit && <div className="row" style={{ marginTop: 10 }}>
           <input style={{ width: 110 }} placeholder="Pincode" value={pin.pincode} onChange={(e) => setPin({ ...pin, pincode: e.target.value })} />
           <input style={{ width: 200 }} placeholder="Area" value={pin.area} onChange={(e) => setPin({ ...pin, area: e.target.value })} />
@@ -42,6 +62,7 @@ export default function SettingsPage() {
         </div>}
       </Card>
 
+      {/* Delivery weekdays and closure days */}
       <Card title="Operating calendar">
         <div className="row">{DAYS.map((d, i) => (<label key={d} className="row"><input type="checkbox" style={{ width: 'auto' }} disabled={!canEdit} checked={days.includes(i)} onChange={() => setDays(days.includes(i) ? days.filter((x) => x !== i) : [...days, i])} />{d}</label>))}</div>
         {canEdit && <div style={{ marginTop: 10 }}><Button small onClick={() => run(() => api('/admin/settings', { method: 'PUT', body: { operatingDays: days } }))}>Save delivery days</Button></div>}
@@ -54,6 +75,7 @@ export default function SettingsPage() {
         </div>}
       </Card>
 
+      {/* Price per meal for each plan */}
       <Card title="Rate card (₹ per meal)">
         <Table head={['Plan', ...['BREAKFAST', 'LUNCH', 'SNACK', 'DINNER'].map((m) => MEAL_LABEL[m])]}>
           {rates.map((r, i) => (<tr key={r.planId}><td>{r.plan}</td>{['BREAKFAST', 'LUNCH', 'SNACK', 'DINNER'].map((m) => (<td key={m}><input type="number" style={{ width: 90 }} disabled={!canEdit} value={r.rates[m] ?? ''} onChange={(e) => setRates((p) => { const c = structuredClone(p); c[i].rates[m] = num(e.target.value); return c; })} /></td>))}</tr>))}
@@ -61,6 +83,7 @@ export default function SettingsPage() {
         {canEdit && <div style={{ marginTop: 10 }}><Button small onClick={() => run(() => api('/admin/settings', { method: 'PUT', body: { rateCard: rates.map((r) => ({ planId: r.planId, rates: r.rates })) } }))}>Save rate card</Button></div>}
       </Card>
 
+      {/* Discounts, GST, delivery charges, capacity */}
       <Card title="Pricing rules">
         <div className="grid2">
           {Object.keys(pricing.discount).map((d) => (<Field key={d} label={`Discount on ${d} days (%)`}><input type="number" disabled={!canEdit} value={pricing.discount[d]} onChange={(e) => setP(['discount', d], num(e.target.value))} /></Field>))}

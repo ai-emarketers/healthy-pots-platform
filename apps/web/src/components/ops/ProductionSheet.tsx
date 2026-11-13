@@ -4,6 +4,7 @@ import { useApi, fmtDate, fmtTime, MEAL_LABEL } from '@/lib/api';
 import { Button, Card, Loading, Notice, StatusBadge, Table, Badge } from '@/components/ui';
 
 /** Shows whether the sheet is a draft or final. */
+// Final vs draft banner
 export function SheetBanner({ s }: { s: any }) {
   return s.final ? (
     <Notice tone="good">Final production sheet. Locked at {fmtTime(s.lockedAt)}. {s.totals.meals} meals confirmed. Customer changes are now rejected for this date.</Notice>
@@ -13,6 +14,7 @@ export function SheetBanner({ s }: { s: any }) {
 }
 
 /** Allergen alerts and dish conflicts for the date. */
+// Table of customers with allergies and whether the dish conflicts
 export function AllergenTable({ rows, notDeclared }: { rows: any[]; notDeclared: string[] }) {
   return (
     <Card title="Allergen alerts for this date">
@@ -34,19 +36,25 @@ export function AllergenTable({ rows, notDeclared }: { rows: any[]; notDeclared:
 }
 
 /** Downloads the production sheet as a CSV file. */
+// Builds a CSV file in the browser and downloads it
 function exportCsv(s: any) {
+  // Quote a CSV cell (doubles any inner quotes)
   const q = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // Header row, then one row per meal
   const rows = [['Date', 'Meal type', 'Meal ID', 'Dish', 'Diet', 'Customer']];
   for (const g of s.groups) for (const k of ['veg', 'nonVeg'] as const) for (const m of g[k]) rows.push([s.date, g.label, m.code, m.dish, k === 'veg' ? 'Veg' : 'Non-Veg', m.customer]);
+  // File content
   const blob = new Blob([rows.map((r) => r.map(q).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
+  // File name like production-sheet-2026-11-14.csv
   a.download = `production-sheet-${s.date}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
 
 /** Meals grouped by type and Veg / Non-Veg. */
+// Full sheet: banner, export button, meal groups, allergen table
 export function ProductionSheet({ date }: { date: string }) {
   const { data: s, error, loading } = useApi<any>(`/kitchen/sheet?date=${date}`);
   if (!s) return <Loading error={error} loading={loading} />;
@@ -54,6 +62,7 @@ export function ProductionSheet({ date }: { date: string }) {
     <>
       <SheetBanner s={s} />
       <div style={{ margin: '8px 0' }}><Button small kind="ghost" onClick={() => exportCsv(s)}>Export production sheet (CSV)</Button></div>
+      {/* One card per meal type, split Veg / Non-Veg */}
       {s.groups.map((g: any) => (
         <Card key={g.mealType} title={`${g.label} · ${g.count} meals`} action={<span className="muted">{g.window}</span>}>
           {g.count === 0 && <p className="muted">Nothing to prepare.</p>}

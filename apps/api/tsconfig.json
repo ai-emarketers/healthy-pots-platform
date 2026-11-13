@@ -2,15 +2,20 @@
   "compilerOptions": {
     "module": "commonjs",
     "declaration": false,
+    // Comments are stripped from the compiled JS output
     "removeComments": true,
+    // Required for NestJS dependency injection and class-validator
     "emitDecoratorMetadata": true,
+    // Enables @Decorators
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    // Compile to modern JavaScript
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
     "skipLibCheck": true,
+    // Relaxed typing used throughout this project
     "strictNullChecks": false,
     "noImplicitAny": false,
     "strictBindCallApply": false,

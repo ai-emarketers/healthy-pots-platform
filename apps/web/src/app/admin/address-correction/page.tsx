@@ -4,26 +4,42 @@ import { useEffect, useState } from 'react';
 import { api, useApi, fmtTime, MEAL_LABEL } from '@/lib/api';
 import { Button, Card, Field, Notice, PageHeader, Table } from '@/components/ui';
 
+// Super-admin tool to fix a delivery address after payment (audited)
 export default function AddressCorrection() {
+  // Active subscriptions for the dropdown
   const { data: subs } = useApi<any[]>('/admin/subscriptions?status=ACTIVE');
+  // Past corrections from the audit log
   const { data: log, reload } = useApi<any[]>('/admin/address-corrections');
+  // Selected subscription
   const [id, setId] = useState('');
+  // Selected meal type
   const [meal, setMeal] = useState('LUNCH');
+  // Fixed addresses of the selected subscription
   const { data: addrs } = useApi<any[]>(id ? `/admin/subscriptions/${id}/addresses` : null);
+  // Corrected address + reason
   const [f, setF] = useState({ line1: '', landmark: '', city: 'Kolkata', pincode: '', reason: '' });
+  // Result message
   const [msg, setMsg] = useState<any>(null);
+  // Pre-select the first subscription
   useEffect(() => { if (subs?.length && !id) setId(subs[0].id); }, [subs, id]);
+  // Address of the chosen meal (or the first one)
   const cur = addrs?.find((a) => a.mealType === meal) ?? addrs?.[0];
+  // Fill the form with the current address so the admin edits it
   useEffect(() => { if (cur) { setMeal(cur.mealType); setF((p) => ({ ...p, line1: cur.line1, landmark: cur.landmark ?? '', city: cur.city, pincode: cur.pincode })); } }, [cur?.id]);
+  // Update one form field
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  // Send the correction (the API checks the super-admin role and writes old/new to the audit log)
   async function apply() {
     try { await api('/admin/address-corrections', { body: { subscriptionId: id, mealType: cur.mealType, ...f } }); setMsg({ tone: 'good', text: 'Correction applied. Open kitchen orders pick up the new address.' }); reload(); }
     catch (e: any) { setMsg({ tone: 'bad', text: e.message }); }
   }
   return (
     <>
+      {/* Title and warning about restricted use */}
       <PageHeader title="Exceptional address correction" sub="Restricted. Customers cannot change addresses after payment. Use this only for errors such as a missing landmark." />
+      {/* Reminder that the change is audited */}
       <Notice tone="warn">Super admin area. The old and new address are stored in the audit log.</Notice>
+      {/* Correction form */}
       <Card>
         <div className="grid2">
           <Field label="Subscription"><select value={id} onChange={(e) => setId(e.target.value)}>{subs?.map((s) => <option key={s.id} value={s.id}>{s.code} · {s.customer}</option>)}</select></Field>
@@ -37,9 +53,11 @@ export default function AddressCorrection() {
           <Field label="Pincode"><input value={f.pincode} onChange={(e) => set('pincode', e.target.value)} /></Field>
           <Field label="Reason"><input value={f.reason} onChange={(e) => set('reason', e.target.value)} /></Field>
         </div>
+        {/* Result banner */}
         {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
         <Button onClick={apply} disabled={!cur || !f.line1}>Apply correction</Button>
       </Card>
+      {/* History of corrections */}
       <Card title="Past corrections">
         <Table head={['Time', 'Who', 'Meal', 'Old', 'New', 'Reason']} empty={log?.length ? undefined : 'None yet.'}>
           {log?.map((a) => (<tr key={a.id}><td>{fmtTime(a.at)}</td><td>{a.actorLabel}</td><td>{a.target}</td><td>{a.oldValue}</td><td>{a.newValue}</td><td>{a.reason ?? '–'}</td></tr>))}

@@ -6,6 +6,7 @@ import { Button, Card, Field, Loading, Notice, PageHeader } from '@/components/u
 import { api, useApi } from '@/lib/api';
 import { emailError, hasErrors, nameError, numberError, Errors } from '@/lib/validate';
 
+// Sidebar links and portal title per role (profile is shared by all roles)
 const NAV: Record<string, { portal: string; nav: { href: string; label: string }[] }> = {
   CUSTOMER: { portal: 'Customer', nav: [{ href: '/customer', label: 'My plan' }, { href: '/profile', label: 'My profile' }] },
   OPERATIONS: { portal: 'Operations', nav: [{ href: '/operations', label: 'Operations' }, { href: '/profile', label: 'My profile' }] },
@@ -13,15 +14,23 @@ const NAV: Record<string, { portal: string; nav: { href: string; label: string }
   SUPER_ADMIN: { portal: 'Admin', nav: [{ href: '/admin', label: 'Admin' }, { href: '/profile', label: 'My profile' }] },
 };
 
+// "My profile" page
 export default function ProfilePage() {
+  // Load the profile from the API
   const { data, error, loading, reload } = useApi<any>('/profile');
+  // Editable form values (all strings)
   const [f, setF] = useState<Record<string, string>>({});
+  // Validation errors
   const [errs, setErrs] = useState<Errors>({});
+  // Success/error message for the profile form
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+  // Password form values
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
+  // Message for the password form
   const [pwMsg, setPwMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
 
   /** Fill the form once the profile has loaded. */
+  // Copy loaded data into the form
   useEffect(() => {
     if (!data) return;
     const c = data.customer;
@@ -31,11 +40,16 @@ export default function ProfilePage() {
     });
   }, [data]);
 
+  // Creates a change handler for one field
   const set = (k: string) => (e: any) => setF((p) => ({ ...p, [k]: e.target.value }));
+  // Sidebar config for this role
   const shell = NAV[data?.role ?? 'CUSTOMER'];
 
+  // Validate then PATCH /profile
   async function save() {
+    // Basic checks for everyone
     const e: Errors = { name: nameError(f.name ?? ''), email: emailError(f.email ?? '') };
+    // Body measurements apply to customers only
     if (data?.customer) {
       e.age = numberError(f.age, 'Age', 10, 100);
       e.weightKg = numberError(f.weightKg, 'Weight', 20, 300);
@@ -43,6 +57,7 @@ export default function ProfilePage() {
     }
     setErrs(e);
     if (hasErrors(e)) return;
+    // Only send the fields that have a value
     const body: any = { name: f.name.trim(), email: f.email.trim() || undefined };
     if (data?.customer) {
       body.city = f.city; body.gender = f.gender;
@@ -51,12 +66,14 @@ export default function ProfilePage() {
       if (f.heightCm) body.heightCm = Number(f.heightCm);
     }
     try {
+      // Save to the API
       await api('/profile', { method: 'PATCH', body });
       setMsg({ tone: 'good', text: 'Profile saved.' });
       reload();
     } catch (x: any) { setMsg({ tone: 'bad', text: x.message }); }
   }
 
+  // Staff only: POST /profile/password
   async function changePassword() {
     try {
       await api('/profile/password', { method: 'POST', body: pw });
@@ -67,10 +84,13 @@ export default function ProfilePage() {
 
   return (
     <Shell portal={shell.portal} nav={shell.nav}>
+      {/* Page title */}
       <PageHeader title="My profile" sub="Your details, visible only to you and the Healthy Pots team." />
       <Loading error={error} loading={loading} />
+      {/* Content appears once the profile has loaded */}
       {data && (
         <>
+          {/* Read-only account facts */}
           <Card title="Account">
             <div className="grid2">
               <Field label="Role"><input value={data.role.replace('_', ' ').toLowerCase()} disabled /></Field>
@@ -79,10 +99,12 @@ export default function ProfilePage() {
               <Field label="Member since"><input value={new Date(data.memberSince).toLocaleDateString('en-IN')} disabled /></Field>
             </div>
           </Card>
+          {/* Editable details */}
           <Card title="Personal details">
             <div className="grid2">
               <Field label="Full name" error={errs.name}><input value={f.name ?? ''} onChange={set('name')} /></Field>
               <Field label="Email" error={errs.email}><input value={f.email ?? ''} onChange={set('email')} type="email" /></Field>
+              {/* Body details are shown to customers only */}
               {data.customer && (
                 <>
                   <Field label="City"><input value={f.city ?? ''} onChange={set('city')} /></Field>
@@ -100,6 +122,7 @@ export default function ProfilePage() {
             {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
             <Button onClick={save}>Save changes</Button>
           </Card>
+          {/* Password card is hidden for customers (they use OTP) */}
           {data.role !== 'CUSTOMER' && (
             <Card title="Change password">
               <div className="grid2">
