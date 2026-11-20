@@ -80,6 +80,22 @@ export class AuthService {
   /** Sends the OTP as an SMS through Twilio (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID). */
   // Sends the one-time code by SMS using Twilio's REST API
   protected async sendOtp(phone: string, code: string) {
+    // Fast2SMS is used when FAST2SMS_API_KEY is set (OTP route, India); otherwise falls back to Twilio below
+    const f2sKey = process.env.FAST2SMS_API_KEY;
+    if (f2sKey) {
+      const url = new URL('https://www.fast2sms.com/dev/bulkV2');
+      url.searchParams.set('route', 'otp');
+      url.searchParams.set('variables_values', code);
+      url.searchParams.set('numbers', phone);
+      url.searchParams.set('flash', '0');
+      const r = await fetch(url, { headers: { authorization: f2sKey } });
+      const j: any = await r.json().catch(() => ({}));
+      if (!r.ok || j.return !== true) {
+        console.error('[auth] Fast2SMS failed', r.status, JSON.stringify(j));
+        throw new BadRequestException('Could not send the OTP right now. Please try again.');
+      }
+      return;
+    }
     const sid = process.env.TWILIO_ACCOUNT_SID;
     const token = process.env.TWILIO_AUTH_TOKEN;
     const from = process.env.TWILIO_FROM;
