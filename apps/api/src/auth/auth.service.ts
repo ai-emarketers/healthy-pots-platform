@@ -84,8 +84,9 @@ export class AuthService {
     const f2sKey = process.env.FAST2SMS_API_KEY;
     if (f2sKey) {
       const url = new URL('https://www.fast2sms.com/dev/bulkV2');
-      url.searchParams.set('route', 'otp');
-      url.searchParams.set('variables_values', code);
+      // Quick SMS route (no DLT needed, ~Rs 7/SMS). Switch to the DLT/OTP route before real customer traffic.
+      url.searchParams.set('route', 'q');
+      url.searchParams.set('message', `${code} is your The Healthy Pots verification code. It is valid for 5 minutes.`);
       url.searchParams.set('numbers', phone);
       url.searchParams.set('flash', '0');
       const r = await fetch(url, { headers: { authorization: f2sKey } });
