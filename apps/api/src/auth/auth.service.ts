@@ -46,6 +46,13 @@ export class AuthService {
     return (process.env.OTP_MODE ?? 'dev') === 'dev';
   }
 
+  /** Fixed OTP for allow-listed test numbers only: TEST_OTP_PHONES=6290784194 (comma separated) and TEST_OTP_CODE=6 digits. */
+  private testCodeFor(phone: string): string | null {
+    const code = process.env.TEST_OTP_CODE ?? '';
+    const phones = (process.env.TEST_OTP_PHONES ?? '').split(',').map((x) => normalizePhone(x.trim())).filter(Boolean);
+    return /^\d{6}$/.test(code) && phones.includes(phone) ? code : null;
+  }
+
   /** Creates a 6-digit OTP for a mobile number (rate limited) and reports whether the number is new. */
   // Creates and stores a one-time code for a mobile number
   async requestOtp(rawPhone: string) {
@@ -63,8 +70,10 @@ export class AuthService {
     });
     // Rate limit per phone number: 3/min in production, 30/min in development
     if (recent >= (process.env.NODE_ENV === 'production' ? 3 : 30)) throw new BadRequestException('Too many OTP requests. Try again in a minute.');
+    // Allow-listed test numbers (TEST_OTP_PHONES + TEST_OTP_CODE) get a fixed code and no SMS; all other numbers are unaffected
+    const testCode = this.testCodeFor(phone);
     // Dev: fixed code. Otherwise a random 6-digit code
-    const code = this.devMode ? DEV_OTP : String(Math.floor(100000 + Math.random() * 900000));
+    const code = testCode ?? (this.devMode ? DEV_OTP : String(Math.floor(100000 + Math.random() * 900000)));
     // Store only a bcrypt HASH of the code (never the code itself), valid 5 minutes
     await this.prisma.otpCode.create({
       data: { phone, codeHash: await bcrypt.hash(code, 8), expiresAt: new Date(Date.now() + 5 * 60_000) },
@@ -72,7 +81,7 @@ export class AuthService {
     // Dev only: show the code in the API console (never sent to the browser)
     if (this.devMode) console.log(`[auth] OTP for ${phone}: ${code}  (OTP_MODE=dev, never returned to the browser)`);
     // Production: send through the SMS/WhatsApp provider
-    else await this.sendOtp(phone, code);
+    else if (!testCode) await this.sendOtp(phone, code);
     const existing = await this.prisma.user.findUnique({ where: { phone } });
     return { sent: true, otpRequired: true, isNew: !existing };
   }
