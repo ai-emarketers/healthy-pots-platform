@@ -77,10 +77,29 @@ export class AuthService {
     return { sent: true, otpRequired: true, isNew: !existing };
   }
 
-  /** Plug an SMS/WhatsApp provider in here for production. */
-  // Placeholder: connect an SMS provider here before going live
-  protected async sendOtp(_phone: string, _code: string) {
-    throw new Error('OTP_MODE is not "dev" but no SMS provider is configured in AuthService.sendOtp');
+  /** Sends the OTP as an SMS through Twilio (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM or TWILIO_MESSAGING_SERVICE_SID). */
+  // Sends the one-time code by SMS using Twilio's REST API
+  protected async sendOtp(phone: string, code: string) {
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
+    const from = process.env.TWILIO_FROM;
+    const service = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    if (!sid || !token || (!from && !service)) throw new Error('Twilio is not configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM)');
+    // Numbers are stored as 10 digits; add the country code (default India +91)
+    const to = `${process.env.OTP_COUNTRY_CODE ?? '+91'}${phone}`;
+    const body = new URLSearchParams({ To: to, Body: `${code} is your The Healthy Pots verification code. It is valid for 5 minutes.` });
+    if (service) body.set('MessagingServiceSid', service);
+    else body.set('From', from);
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    if (!res.ok) {
+      // Log the provider error for the operator, but show the customer a safe message
+      console.error('[auth] Twilio SMS failed', res.status, await res.text());
+      throw new BadRequestException('Could not send the OTP right now. Please try again.');
+    }
   }
 
   /** Checks the OTP (max 5 attempts), creates the customer on first login and starts a session. */

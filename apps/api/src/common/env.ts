@@ -13,6 +13,8 @@ export function checkEnv() {
   else if (prod && secret.length < 32) problems.push('JWT_SECRET must be at least 32 characters in production');
   // Fixed OTP / no OTP would be a security hole in production
   if (prod && ['dev', 'off'].includes(process.env.OTP_MODE ?? 'dev')) problems.push('OTP_MODE must not be dev or off in production (connect an SMS provider and use OTP_MODE=prod)');
+  // Production OTP needs Twilio credentials
+  if (prod && process.env.OTP_MODE === 'prod' && !(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && (process.env.TWILIO_FROM || process.env.TWILIO_MESSAGING_SERVICE_SID))) problems.push('OTP_MODE=prod needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM (or TWILIO_MESSAGING_SERVICE_SID)');
   // Print all problems and exit with an error code
   if (problems.length) {
     console.error('\nConfiguration problems:\n - ' + problems.join('\n - ') + '\n\nCopy .env.example to .env and fill it in.\n');
