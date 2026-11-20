@@ -12,7 +12,11 @@ export function checkEnv() {
   // Weak secrets are refused in production
   else if (prod && secret.length < 32) problems.push('JWT_SECRET must be at least 32 characters in production');
   // Fixed OTP / no OTP would be a security hole in production
-  if (prod && ['dev', 'off'].includes(process.env.OTP_MODE ?? 'dev')) problems.push('OTP_MODE must not be dev or off in production (connect an SMS provider and use OTP_MODE=prod)');
+  // Exception: OTP_MODE=dev (fixed code) is allowed in production only when ALLOW_FIXED_OTP=true is set on purpose (demo/testing)
+  const otpMode = process.env.OTP_MODE ?? 'dev';
+  const fixedOtpAllowed = otpMode === 'dev' && process.env.ALLOW_FIXED_OTP === 'true';
+  if (prod && fixedOtpAllowed) console.warn('[security] ALLOW_FIXED_OTP=true: anyone can log in as any customer with the fixed OTP. Demo/testing only.');
+  if (prod && ['dev', 'off'].includes(otpMode) && !fixedOtpAllowed) problems.push('OTP_MODE must not be dev or off in production (connect an SMS provider and use OTP_MODE=prod, or set ALLOW_FIXED_OTP=true for demo use)');
   // Production OTP needs Twilio credentials
   if (prod && process.env.OTP_MODE === 'prod' && !(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && (process.env.TWILIO_FROM || process.env.TWILIO_MESSAGING_SERVICE_SID))) problems.push('OTP_MODE=prod needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM (or TWILIO_MESSAGING_SERVICE_SID)');
   // Print all problems and exit with an error code
