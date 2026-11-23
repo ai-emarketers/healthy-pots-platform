@@ -160,19 +160,22 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 .chip.on { border-color: var(--green); background: var(--lime); color: var(--ink); font-weight: 700; }
 
 /* ---- Login page: split screen (brand panel + sign-in form) ---- */
-.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); background: var(--bg); }
-.auth-art { background: var(--green); color: var(--bg); padding: 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; }
+.auth { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); background: var(--bg); }
+.auth-art { background: var(--green); color: var(--bg); padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; overflow: hidden; }
 .auth-logo { font-family: var(--font-display); font-size: 32px; line-height: 1; }
-.auth-art h1 { color: var(--bg); font-size: 84px; line-height: .88; margin: 0 0 28px; }
-.auth-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.auth-photo { height: 210px; border-radius: 20px; background-color: var(--green-soft); background-size: cover; background-position: center; }
-.auth-photo.photo-1 { background-image: url('/login/thecha.jpg'); }
-.auth-photo.photo-2 { background-image: url('/login/steak.jpg'); }
-.auth-form { display: flex; align-items: center; justify-content: center; padding: 56px 24px; }
-.auth-box { width: 100%; max-width: 420px; }
-.auth-box h2 { font-size: 56px; line-height: .9; margin: 0 0 20px; }
+.auth-art h1 { color: var(--bg); font-size: clamp(56px, 7vw, 104px); line-height: .85; margin: 0 0 36px; }
+.auth-photos { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; }
+.auth-photo { position: relative; border-radius: 24px; background-color: var(--green-soft); background-size: cover; background-position: center; }
+/* Two fixed photos from public/login */
+.auth-photo.photo-1 { height: 300px; background-image: url('/login/thecha.jpg'); }
+.auth-photo.photo-2 { height: 240px; margin-top: 56px; background-image: url('/login/steak.jpg'); }
+.auth-photo.photo-1::after { content: 'Made fresh daily'; position: absolute; top: 14px; left: 14px; background: var(--lime); color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 5px 14px; border-radius: 20px; }
+.auth-form { display: flex; align-items: center; justify-content: center; padding: 40px 28px; }
+.auth-box { width: 100%; max-width: 460px; background: var(--card); border-radius: var(--radius); padding: 44px 40px; }
+.auth-box h2 { font-size: 56px; line-height: .9; margin: 0 0 22px; color: var(--green); }
 @media (max-width: 860px) {
   .auth { grid-template-columns: 1fr; }
-  .auth-art { padding: 28px 22px; gap: 20px; } .auth-art h1 { font-size: 48px; margin-bottom: 18px; } .auth-photo { height: 110px; }
-  .auth-form { padding: 32px 22px 48px; } .auth-box h2 { font-size: 44px; }
+  .auth-art { padding: 28px 22px; gap: 20px; } .auth-art h1 { font-size: 52px; margin-bottom: 20px; }
+  .auth-photo.photo-1 { height: 150px; } .auth-photo.photo-2 { height: 120px; margin-top: 24px; }
+  .auth-form { padding: 24px 16px 48px; } .auth-box { padding: 32px 24px; } .auth-box h2 { font-size: 44px; }
 }
