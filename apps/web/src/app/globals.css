@@ -164,11 +164,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 .auth-art { background: var(--green); color: var(--bg); padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; overflow: hidden; }
 .auth-logo { font-family: var(--font-display); font-size: 32px; line-height: 1; }
 .auth-art h1 { color: var(--bg); font-size: clamp(56px, 7vw, 104px); line-height: .85; margin: 0 0 36px; }
-.auth-photos { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; }
-.auth-photo { position: relative; border-radius: 24px; background-color: var(--green-soft); background-size: cover; background-position: center; }
+.auth-photos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.auth-photo { position: relative; aspect-ratio: 1 / 1; border-radius: 24px; background-color: var(--green-soft); background-size: cover; background-position: center; }
 /* Two fixed photos from public/login */
-.auth-photo.photo-1 { height: 300px; background-image: url('/login/thecha.jpg'); }
-.auth-photo.photo-2 { height: 240px; margin-top: 56px; background-image: url('/login/steak.jpg'); }
+.auth-photo.photo-1 { background-image: url('/login/thecha.jpg'); }
+.auth-photo.photo-2 { background-image: url('/login/steak.jpg'); }
 .auth-photo.photo-1::after { content: 'Made fresh daily'; position: absolute; top: 14px; left: 14px; background: var(--lime); color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 5px 14px; border-radius: 20px; }
 .auth-form { display: flex; align-items: center; justify-content: center; padding: 40px 28px; }
 .auth-box { width: 100%; max-width: 460px; background: var(--card); border-radius: var(--radius); padding: 44px 40px; }
@@ -176,6 +176,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 @media (max-width: 860px) {
   .auth { grid-template-columns: 1fr; }
   .auth-art { padding: 28px 22px; gap: 20px; } .auth-art h1 { font-size: 52px; margin-bottom: 20px; }
-  .auth-photo.photo-1 { height: 150px; } .auth-photo.photo-2 { height: 120px; margin-top: 24px; }
+  .auth-photos { gap: 12px; }
   .auth-form { padding: 24px 16px 48px; } .auth-box { padding: 32px 24px; } .auth-box h2 { font-size: 44px; }
 }
