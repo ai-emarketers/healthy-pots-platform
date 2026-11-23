@@ -50,5 +50,5 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Run on every route except Next internals, the /backend proxy and the favicon
-export const config = { matcher: ['/((?!_next/|backend/|favicon.ico).*)'] };
+// Run on every route except Next internals, the /backend proxy, the favicon and static images (so the login photos load before login)
+export const config = { matcher: ['/((?!_next/|backend/|favicon.ico|.*\\.(?:jpg|jpeg|png|webp|svg)$).*)'] };

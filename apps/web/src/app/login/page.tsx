@@ -1,6 +1,5 @@
 'use client';
 /** The single login page for customers (OTP) and staff (email and password). */
-import Link from 'next/link';
 import { FormEvent, Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -82,26 +81,34 @@ function LoginForm() {
   };
 
   return (
-    <div className="login-wrap">
-      {/* (login card content follows) */}
-      <div className="login-card">
-        <div className="brand big">The Healthy Pots<small>Meal subscriptions</small></div>
-        <h1>Welcome</h1>
-        <p className="muted">Log in or create your profile to get started. Then choose your goal.</p>
+    <div className="auth">
+      {/* Left: brand panel with a headline and two fixed photos */}
+      <aside className="auth-art">
+        <div className="auth-logo">The Healthy Pots</div>
+        <div className="auth-art-body">
+          <h1>Fresh meals.<br />Made for you.</h1>
+          <div className="auth-photos" aria-hidden="true">
+            <div className="auth-photo photo-1" />
+            <div className="auth-photo photo-2" />
+          </div>
+        </div>
+      </aside>
+      {/* Right: only the sign-in details */}
+      <main className="auth-form">
+        <div className="auth-box">
+        <h2>Welcome back</h2>
         {/* Switch between Customer and Staff */}
         <Segmented value={who} onChange={(m) => { setWho(m); setError(''); setErrors({}); }} options={[{ value: 'customer', label: 'Customer' }, { value: 'staff', label: 'Staff' }]} />
 
         {/* Customer step 1: phone number form */}
         {who === 'customer' && step === 'phone' && (
           <>
-            <div style={{ marginTop: 12 }}><Segmented value={tab} onChange={(t) => { setTab(t); setError(''); setErrors({}); }} options={[{ value: 'login', label: 'Log in' }, { value: 'create', label: 'Create profile' }]} /></div>
             <form onSubmit={requestOtp} className="stack" noValidate>
               {tab === 'create' && <Field label="Full name" error={errors.name}><input autoComplete="name" value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={80} /></Field>}
               <Field label="Mobile number" error={errors.phone}><input inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile number" value={f.phone} onChange={(e) => set('phone', e.target.value)} maxLength={16} /></Field>
               {tab === 'create' && <Field label="Email" error={errors.email}><input type="email" autoComplete="email" value={f.email} onChange={(e) => set('email', e.target.value)} maxLength={120} /></Field>}
               <Button type="submit" disabled={busy}>{tab === 'create' ? 'Create profile and continue' : 'Send OTP'}</Button>
             </form>
-            <div className="link-row"><Link href="/goals">Skip for now and browse goals</Link></div>
           </>
         )}
         {/* Customer step 2: OTP form */}
@@ -123,7 +130,8 @@ function LoginForm() {
         )}
         {/* Server error banner */}
         {error && <Notice tone="bad">{error}</Notice>}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
